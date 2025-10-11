@@ -1,163 +1,186 @@
-# HerFoodCode RAG Backend
+# HerFoodCode - AI-Powered Women's Health App
 
-This repository contains the RAG (Retrieval-Augmented Generation) backend components extracted from the original HerFoodCode application. This is the core AI/ML pipeline that powers personalized health advice generation.
+A comprehensive health and wellness application that provides personalized intervention recommendations for women's health conditions, particularly PCOS and hormonal imbalances.
 
-## 🏗️ **Architecture Overview**
+## 🏗️ Architecture
 
-### **RAG Pipeline Components**
-- **Document Processing**: PDF → Text → Chunks → Vector Embeddings
-- **Vector Database**: ChromaDB for similarity search
-- **LLM Integration**: OpenAI GPT-4 for content generation
-- **Strategy Database**: CSV-based strategy management
+- **Backend**: FastAPI with Supabase database
+- **Frontend**: React Native mobile app
+- **AI**: OpenAI GPT-4 with RAG pipeline
+- **Database**: PostgreSQL (Supabase)
+- **Authentication**: Supabase Auth with RLS
 
-### **Core Technology Stack**
-- **Python 3.13** - Programming language
-- **LangChain** - Conversational AI framework
-- **OpenAI GPT-4** - Language model
-- **ChromaDB** - Vector database
-- **Pandas** - Data manipulation
-- **PDF Processing** - Text extraction from health books
-
-## 📁 **Repository Structure**
+## 📁 Project Structure
 
 ```
 hfc_app_v2/
-├── backend/
-│   ├── rag_pipeline.py          # Main RAG pipeline
-│   ├── build_strategy_store.py  # Vector store builder
-│   ├── requirements.txt         # Python dependencies
-│   └── data/
-│       ├── strategies.csv       # Strategy database
-│       ├── raw_book/
-│       │   ├── InFloBook.pdf    # Source health book
-│       │   └── InFloBook.txt    # Extracted text
-│       ├── processed/
-│       │   └── chunks_AlisaVita.json  # Processed text chunks
-│       └── vectorstore/         # ChromaDB vector stores
-│           ├── chroma/          # Main vector store
-│           └── strategies_chroma/  # Strategy-specific vector store
-├── build_vectorstore.py         # PDF processing script
-└── README.md                    # This file
+├── backend/                    # FastAPI backend
+│   ├── api.py                 # Main API endpoints
+│   ├── rag_pipeline.py        # RAG processing pipeline
+│   ├── auth_service.py        # Authentication service
+│   ├── llm.py                 # LLM configuration
+│   ├── llm_explanations.py    # LLM explanation generation
+│   ├── simple_intake_service.py # Data collection service
+│   ├── models/                # Data models and schemas
+│   ├── interventions/         # Intervention matching logic
+│   ├── retrievers/            # Vector store retrieval
+│   ├── utils/                 # Utility functions
+│   ├── data/                  # Data and vector stores
+│   └── requirements.txt       # Python dependencies
+├── mobile/                    # React Native mobile app
+│   ├── src/
+│   │   ├── screens/           # App screens
+│   │   ├── components/        # Reusable components
+│   │   ├── navigation/        # Navigation logic
+│   │   ├── services/          # API services
+│   │   ├── contexts/          # React contexts
+│   │   ├── types/             # TypeScript types
+│   │   └── constants/         # App constants
+│   ├── App.tsx               # Main app component
+│   └── package.json          # Node.js dependencies
+└── archive/                   # Archived files (deprecated)
 ```
 
-## 🚀 **Quick Start**
+## 🚀 Quick Start
 
-### **1. Environment Setup**
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+### Backend Setup
 
-# Install dependencies
-pip install -r backend/requirements.txt
-```
+1. **Install dependencies**:
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-### **2. Environment Variables**
-Create a `.env` file in the root directory:
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-```
+2. **Configure environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Supabase and OpenAI credentials
+   ```
 
-### **3. Build Vector Store**
-```bash
-# Process PDF and create vector store
-python build_vectorstore.py
+3. **Start the server**:
+   ```bash
+   uvicorn api:app --reload --host 0.0.0.0 --port 8000
+   ```
 
-# Build strategy vector store
-python backend/build_strategy_store.py
-```
+### Mobile App Setup
 
-### **4. Test RAG Pipeline**
-```python
-from backend.rag_pipeline import generate_advice
+1. **Install dependencies**:
+   ```bash
+   cd mobile
+   npm install
+   ```
 
-# Generate advice using RAG
-result = generate_advice(
-    user_question="What should I eat for PCOS?",
-    user_context="I have PCOS and insulin resistance"
-)
-print(result["answer"])
-```
+2. **Start the development server**:
+   ```bash
+   npx expo start
+   ```
 
-## 🔄 **RAG Pipeline Flow**
+## 🔧 Key Features
 
-### **1. Document Processing**
-```
-InFloBook.pdf → Text Extraction → Chunking → Embeddings → ChromaDB
-```
+### Backend Features
+- **RAG Pipeline**: Retrieval-Augmented Generation for intervention recommendations
+- **Authentication**: User registration, login, and profile management
+- **Database Integration**: Supabase with Row Level Security (RLS)
+- **LLM Integration**: OpenAI GPT-4 for explanations and recommendations
+- **Vector Search**: ChromaDB for semantic search of interventions
 
-### **2. Query Processing**
-```
-User Question → Vector Search → Context Retrieval → GPT-4 → Response
-```
+### Mobile App Features
+- **Authentication**: Login/Register screens with form validation
+- **Story Intake**: Comprehensive health assessment
+- **Recommendations**: AI-powered intervention suggestions
+- **Habit Tracking**: Daily habit monitoring and streaks
+- **Profile Management**: User profile and settings
 
-### **3. Strategy Retrieval**
-```
-User Context → Strategy Matching → Personalized Recommendations
-```
+## 📊 Data Flow
 
-## 📊 **Data Sources**
+1. **User Input** → Mobile app collects health data
+2. **API Processing** → Backend validates and processes input
+3. **RAG Pipeline** → Matches user data with interventions
+4. **LLM Enhancement** → Generates personalized explanations
+5. **Response** → Returns recommendations to mobile app
 
-### **Primary Content**
-- **InFloBook.pdf**: Comprehensive health and nutrition guide
-- **strategies.csv**: Structured strategy database with metadata
+## 🔐 Security
 
-### **Vector Stores**
-- **Main Store**: General health content from the book
-- **Strategy Store**: Specific intervention strategies
+- **Row Level Security (RLS)** enabled on all user tables
+- **JWT Authentication** with Supabase Auth
+- **Data Isolation** - users can only access their own data
+- **Input Validation** with Pydantic models
 
-## 🛠️ **Development**
+## 🧪 Testing
 
-### **Adding New Strategies**
-1. Update `backend/data/strategies.csv`
-2. Rebuild vector store: `python backend/build_strategy_store.py`
+The application includes comprehensive testing for:
+- API endpoints
+- Authentication flows
+- Database operations
+- Mobile app functionality
 
-### **Modifying RAG Pipeline**
-- Edit `backend/rag_pipeline.py` for core RAG logic
+## 📝 API Endpoints
 
-### **Testing Changes**
-```bash
-# Test vector store creation
-python backend/build_strategy_store.py
+### Authentication
+- `POST /auth/register` - User registration
+- `POST /auth/login` - User login
+- `POST /auth/logout` - User logout
+- `GET /auth/profile/{user_id}` - Get user profile
 
-# Test RAG pipeline
-python -c "from backend.rag_pipeline import generate_advice; print(generate_advice('test question'))"
-```
+### Recommendations
+- `POST /recommend` - Get intervention recommendations
+- `POST /daily-progress` - Save daily habit progress
+- `GET /user/{user_id}/daily-progress` - Get user progress
 
-## 📈 **Performance Considerations**
+## 🗄️ Database Schema
 
-- **Chunk Size**: 500 characters with 100 character overlap
-- **Embedding Model**: OpenAI text-embedding-ada-002
-- **Retrieval**: Top 3 most similar documents
-- **LLM Model**: GPT-4 with temperature 0 for consistency
+### Core Tables
+- `user_profiles` - User account information
+- `intakes` - Health assessment data
+- `daily_habit_entries` - Daily habit tracking
+- `InterventionsBASE` - Intervention database
+- `HabitsBASE` - Habit database
 
-## 🔒 **Security**
+## 🔄 Development
 
-- API keys stored in environment variables
-- No sensitive data in repository
-- Vector stores contain only processed health content
+### Adding New Features
+1. Update models in `backend/models/`
+2. Add API endpoints in `backend/api.py`
+3. Update mobile app screens in `mobile/src/screens/`
+4. Test with the provided test scripts
 
-## 📝 **Usage Examples**
+### Database Changes
+1. Update models in `backend/models/`
+2. Run migration scripts (if needed)
+3. Update RLS policies
+4. Test with authentication
 
-### **Basic RAG Query**
-```python
-from backend.rag_pipeline import generate_advice
+## 📚 Documentation
 
-result = generate_advice(
-    user_question="How can I manage insulin resistance?",
-    user_context="I have PCOS and want to improve my blood sugar"
-)
-```
+- **API Documentation**: Available at `http://localhost:8000/docs` when running
+- **Code Comments**: Comprehensive inline documentation
+- **Type Hints**: Full TypeScript and Python type annotations
 
+## 🚨 Troubleshooting
 
-## 🤝 **Contributing**
+### Common Issues
+1. **Database Connection**: Check Supabase credentials in `.env`
+2. **OpenAI API**: Verify API key and quota
+3. **Mobile App**: Ensure backend is running on correct port
+4. **Authentication**: Check RLS policies and user permissions
 
-This is the core RAG backend extracted from the original HerFoodCode application. It's designed to be integrated into new frontend applications while maintaining the powerful AI-driven health advice generation capabilities.
+### Logs
+- Backend logs: Check terminal output
+- Mobile logs: Use Expo CLI or React Native debugger
+- Database logs: Check Supabase dashboard
 
-## 📄 **License**
+## 📄 License
 
-[Add your license information here]
+This project is proprietary software. All rights reserved.
+
+## 🤝 Contributing
+
+For development questions or issues, please contact the development team.
 
 ---
 
-**Note**: This repository contains only the RAG backend components. The original application's frontend, database schemas, and other components have been archived separately.
+**Status**: Production Ready ✅  
+**Last Updated**: January 2025  
+**Version**: 2.0.0

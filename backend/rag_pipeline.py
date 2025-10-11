@@ -1,316 +1,307 @@
-# python rag_pipeline.py
-from langchain_openai import ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ConversationBufferMemory
-from langchain.prompts import PromptTemplate, ChatPromptTemplate
-from langchain_chroma import Chroma
-from langchain_openai import OpenAIEmbeddings
-from langchain.schema.messages import HumanMessage, AIMessage
-import os
-from dotenv import load_dotenv
-from langchain.schema.runnable import RunnablePassthrough
-from langchain.schema.output_parser import StrOutputParser
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-
-load_dotenv()
-
-# Define paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-VECTORSTORE_PATH = os.path.join(BASE_DIR, "data", "vectorstore")
-STRATEGY_VECTORSTORE_PATH = os.path.join(VECTORSTORE_PATH, "strategies_chroma")
-MAIN_VECTORSTORE_PATH = os.path.join(VECTORSTORE_PATH, "chroma")
-
-# Initialize LLM and Embeddings
-llm = ChatOpenAI(model="gpt-4", temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
-embeddings = OpenAIEmbeddings(api_key=os.getenv("OPENAI_API_KEY"))
-
-# Load vector stores
-strategy_vectorstore = None
-strategy_retriever = None
-main_vectorstore = None
-main_retriever = None
-
-try:
-    strategy_vectorstore = Chroma(
-        persist_directory=STRATEGY_VECTORSTORE_PATH,
-        embedding_function=embeddings,
-        collection_name="strategies"
-    )
-    strategy_retriever = strategy_vectorstore.as_retriever(search_kwargs={"k": 3})
-
-    main_vectorstore = Chroma(
-        persist_directory=MAIN_VECTORSTORE_PATH,
-        embedding_function=embeddings
-    )
-    main_retriever = main_vectorstore.as_retriever()
-
-except Exception as e:
-    # Don't exit, let the app continue with None retrievers
-    pass
-
-
-def format_docs(docs):
-    return "\n\n".join(doc.page_content for doc in docs)
-
-
-def ensure_list(val):
-    if isinstance(val, list):
-        return val
-    if val is None:
-        return []
-    return [val]
-
-
-def build_user_context(user_input: dict) -> str:
-    """Build context string from user intake data for RAG queries."""
-    symptoms = ensure_list(user_input.get('symptoms'))
-    symptoms_note = user_input.get('symptoms_note', '')
-    goals = ensure_list(user_input.get('goals'))
-    goals_note = user_input.get('goals_note', '')
-    preferences = ensure_list(user_input.get('dietaryRestrictions')) or ensure_list(user_input.get('preferences'))
-    dietary_note = user_input.get('dietaryRestrictions_note', '')
-    cycle = user_input.get('cycle', '')
-    reason = user_input.get('reason', '')
-    whatWorks = user_input.get('whatWorks', '')
-    extraThoughts = user_input.get('extraThoughts', '')
-
-    context = (
-        f"User Profile:\n"
-        f"- Symptoms: {', '.join(symptoms)}\n"
-        + (f"- Symptom notes: {symptoms_note}\n" if symptoms_note else "")
-        + f"- Goals: {', '.join(goals)}\n"
-        + (f"- Goals notes: {goals_note}\n" if goals_note else "")
-        + f"- Dietary restrictions: {', '.join(preferences)}\n"
-        + (f"- Dietary notes: {dietary_note}\n" if dietary_note else "")
-        + f"- Cycle phase: {cycle}\n"
-        + (f"- Reason for using app: {reason}\n" if reason else "")
-        + (f"- What already works: {whatWorks}\n" if whatWorks else "")
-        + (f"- Additional thoughts: {extraThoughts}\n" if extraThoughts else "")
-    )
-    
-    return context
-
-def build_question(user_input: dict) -> str:
-    """Build a question from user input for the chatbot, using all intakeData fields and optional notes.
-    DEPRECATED: Use build_user_context() + user's actual question instead."""
-    symptoms = ensure_list(user_input.get('symptoms'))
-    symptoms_note = user_input.get('symptoms_note', '')
-    goals = ensure_list(user_input.get('goals'))
-    goals_note = user_input.get('goals_note', '')
-    preferences = ensure_list(user_input.get('dietaryRestrictions')) or ensure_list(user_input.get('preferences'))
-    dietary_note = user_input.get('dietaryRestrictions_note', '')
-    cycle = user_input.get('cycle', '')
-    reason = user_input.get('reason', '')
-    whatWorks = user_input.get('whatWorks', '')
-    extraThoughts = user_input.get('extraThoughts', '')
-
-    question = (
-        f"My symptoms are: {', '.join(symptoms)}. "
-        + (f"Symptom notes: {symptoms_note}. " if symptoms_note else "")
-        + f"My goals are: {', '.join(goals)}. "
-        + (f"Goals notes: {goals_note}. " if goals_note else "")
-        + f"My dietary restrictions are: {', '.join(preferences)}. "
-        + (f"Dietary notes: {dietary_note}. " if dietary_note else "")
-        + f"I'm currently in the {cycle} phase of my cycle. "
-        + (f"My reason for using this app: {reason}. " if reason else "")
-        + (f"What already works for me: {whatWorks}. " if whatWorks else "")
-        + (f"Extra thoughts: {extraThoughts}. " if extraThoughts else "")
-        + "What should I eat?"
-    )
-
-    return question
-
-
-def generate_advice(user_question: str, user_context: str = None) -> dict:
-    """Generate advice using the chatbot approach with user's actual question and context."""
-    print(f"RAG Debug: strategy_retriever is {strategy_retriever}")
-    print(f"RAG Debug: user_question: {user_question}")
-    print(f"RAG Debug: user_context: {user_context}")
-    
-    if not strategy_retriever:
-        print("RAG Error: strategy_retriever is None - vector store not loaded")
-        return {"answer": "I'm sorry, but I'm having trouble accessing my knowledge base right now. Please try again later."}
-    
-    if not os.getenv("OPENAI_API_KEY"):
-        print("RAG Error: OPENAI_API_KEY not set")
-        return {"answer": "I'm sorry, but I'm having trouble accessing my knowledge base right now. Please try again later."}
-    
-    # Combine user's actual question with their context
-    if user_context:
-        full_question = f"{user_context}\n\nUser Question: {user_question}"
-    else:
-        full_question = user_question
-    
-    # Create a conversational chain with memory
-    from langchain.chains import ConversationalRetrievalChain
-    from langchain.memory import ConversationBufferMemory
-    
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True
-    )
-    
-    # Create the chain
-    qa_chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=strategy_retriever,
-        memory=memory,
-        return_source_documents=True,
-        output_key="answer",
-        verbose=False
-    )
-    
-    try:
-        # Invoke the chain with the user's actual question
-        result = qa_chain.invoke({"question": full_question})
-        return {"answer": result["answer"]}
-    except Exception as e:
-        print(f"RAG Error: {str(e)}")
-        # Provide a fallback response based on common questions
-        if "eat" in user_question.lower() or "food" in user_question.lower():
-            return {"answer": "For PCOS management, focus on anti-inflammatory foods like leafy greens, berries, fatty fish, and whole grains. Avoid processed foods and refined sugars. Consider working with a nutritionist for personalized meal planning."}
-        elif "exercise" in user_question.lower() or "workout" in user_question.lower():
-            return {"answer": "Regular exercise is crucial for PCOS management. Aim for 150 minutes of moderate activity per week, including both cardio and strength training. Start slowly and gradually increase intensity."}
-        elif "stress" in user_question.lower() or "cortisol" in user_question.lower():
-            return {"answer": "Stress management is important for PCOS. Try meditation, deep breathing, yoga, or other relaxation techniques. Consider speaking with a healthcare provider about stress management strategies."}
-        else:
-            return {"answer": "I'm sorry, but I encountered an error while processing your request. Please try again later or contact support if the issue persists."}
-
-def generate_advice_legacy(user_input: dict) -> dict:
-    """Legacy function for backward compatibility. DEPRECATED: Use generate_advice() with actual user questions."""
-    if not strategy_retriever:
-        return {"answer": "I'm sorry, but I'm having trouble accessing my knowledge base right now. Please try again later."}
-    
-    # Build the question from user input (legacy method)
-    question = build_question(user_input)
-    
-    # Create a conversational chain with memory
-    from langchain.chains import ConversationalRetrievalChain
-    from langchain.memory import ConversationBufferMemory
-    
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True
-    )
-    
-    # Create the chain
-    qa_chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=strategy_retriever,
-        memory=memory,
-        return_source_documents=True,
-        output_key="answer",
-        verbose=False
-    )
-    
-    try:
-        # Invoke the chain with the question
-        result = qa_chain.invoke({"question": question})
-        return {"answer": result["answer"]}
-    except Exception as e:
-        return {"answer": "I'm sorry, but I encountered an error while processing your request. Please try again."}
-
-
-# RAG Chain for Simple Advice (no conversation memory)
-RAG_PROMPT_TEMPLATE = """
-### CONTEXT
-{context}
-
-### QUESTION
-{question}
 """
-rag_prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
+Main RAG Pipeline Entry Point
+Clean, modular interface for intervention recommendations
+"""
 
-# Initialize rag_chain only if main_retriever exists
-rag_chain = None
-if main_retriever is not None:
-    rag_chain = (
-        {"context": main_retriever | format_docs, "question": RunnablePassthrough()}
-        | rag_prompt
-        | llm
-        | StrOutputParser()
-    )
+from typing import Dict
+from interventions.matcher import get_intervention_recommendation, get_multiple_intervention_recommendations
+from interventions.inflo_context import get_intervention_with_inflo_context
+from utils.helpers import clean_text
+from utils.cycle_calculator import calculate_cycle_phase, format_cycle_info
+from models import UserInput
+from llm_explanations import generate_batch_explanations
 
-def get_advice(question: str) -> str:
-    """Get simple advice for a question."""
-    if not strategy_retriever:
-        return "I'm sorry, but I'm having trouble accessing my knowledge base right now. Please try again later."
+def process_user_input(user_input: str) -> Dict:
+    """
+    Main function to process user input and return intervention recommendation
     
-    try:
-        docs = strategy_retriever.invoke(question)
-        if not docs:
-            return "I don't have specific information about that. Please try asking about symptoms, cycle phases, or dietary strategies."
+    Args:
+        user_input: Raw text input from user describing their symptoms, goals, concerns
         
-        # Use the first document for a simple response
-        doc = docs[0]
-        return doc.page_content
-    except Exception as e:
-        return "I'm sorry, but I encountered an error while processing your request. Please try again."
-
-def get_strategies(user_input: dict) -> list:
-    """Get strategy recommendations based on user input."""
-    if not strategy_retriever:
-        return []
+    Returns:
+        Dictionary with intake summary, recommended intervention, and habits
+    """
+    if not user_input or not clean_text(user_input):
+        return {
+            "error": "Please provide some information about your symptoms, goals, or concerns"
+        }
     
-    # Build query from user input
-    symptoms = ensure_list(user_input.get('symptoms'))
-    symptoms_note = user_input.get('symptoms_note', '')
-    goals = ensure_list(user_input.get('goals'))
-    goals_note = user_input.get('goals_note', '')
-    preferences = ensure_list(user_input.get('dietaryRestrictions')) or ensure_list(user_input.get('preferences'))
-    dietary_note = user_input.get('dietaryRestrictions_note', '')
-    cycle = user_input.get('cycle', '')
-    reason = user_input.get('reason', '')
-    whatWorks = user_input.get('whatWorks', '')
-    extraThoughts = user_input.get('extraThoughts', '')
-
-    query = (
-        f"Symptoms: {', '.join(symptoms)}. "
-        + (f"Symptom notes: {symptoms_note}. " if symptoms_note else "")
-        + f"Goals: {', '.join(goals)}. "
-        + (f"Goals notes: {goals_note}. " if goals_note else "")
-        + f"Dietary restrictions: {', '.join(preferences)}. "
-        + (f"Dietary notes: {dietary_note}. " if dietary_note else "")
-        + f"Cycle phase: {cycle}. "
-        + (f"Reason for using the app: {reason}. " if reason else "")
-        + (f"What already works: {whatWorks}. " if whatWorks else "")
-        + (f"Extra thoughts: {extraThoughts}. " if extraThoughts else "")
-        + "Looking for strategies that match this profile."
-    )
-
+    # Get intervention recommendation with InFlo context
     try:
-        docs = strategy_retriever.invoke(query)
-        strategies = [doc.metadata for doc in docs]
-        return strategies
+        result = get_intervention_with_inflo_context(user_input)
+        
+        # Format the response
+        formatted_result = {
+            "intake_summary": build_intake_summary(user_input),
+            "recommended_intervention": result['intervention_name'],
+            "intervention_id": result['intervention_id'],
+            "scientific_reference": result['scientific_source'],
+            "habits": [
+                result['habits']['habit_1'],
+                result['habits']['habit_2'],
+                result['habits']['habit_3'],
+                result['habits']['habit_4'],
+                result['habits']['habit_5']
+            ],
+            "reasoning": f"Recommended based on {result['similarity_score']:.2f} similarity to intervention profile: {result['profile'][:100]}...",
+            "similarity_score": result['similarity_score']
+        }
+        
+        # Add InFlo context if available
+        if 'additional_inflo_context' in result and result['additional_inflo_context'] != "InFlo book context not available":
+            formatted_result["additional_inflo_context"] = result['additional_inflo_context']
+        
+        return formatted_result
+
     except Exception as e:
-        return []
+        return {
+            "error": f"Error processing your request: {str(e)}",
+            "intake_summary": build_intake_summary(user_input),
+            "recommended_intervention": None,
+            "intervention_id": None,
+            "scientific_reference": None,
+            "habits": [],
+            "reasoning": "Error occurred during processing"
+        }
 
+def process_structured_user_input(user_input: UserInput) -> Dict:
+    """
+    Process structured user input and return intervention recommendation
+    
+    Args:
+        user_input: Structured UserInput object with profile, symptoms, interventions, etc.
+        
+    Returns:
+        Dictionary with intake summary, recommended intervention, and habits
+    """
+    print(f"🔍 DEBUG: process_structured_user_input called with user_input: {user_input}")
+    print(f"🔍 DEBUG: user_input.profile: {user_input.profile}")
+    print(f"🔍 DEBUG: user_input.profile.name: {user_input.profile.name}")
+    
+    # Build comprehensive text input from structured data
+    text_input = build_text_from_structured_input(user_input)
+    
+    if not text_input or not clean_text(text_input):
+        return {
+            "error": "Please provide some information about your symptoms, goals, or concerns"
+        }
+    
+    # Get multiple intervention recommendations
+    try:
+        print(f"🔍 DEBUG: Getting multiple interventions for text: {text_input[:100]}...")
+        # Get multiple interventions with similarity >= 0.50
+        multiple_result = get_multiple_intervention_recommendations(text_input, min_similarity=0.50, max_results=3)
+        print(f"🔍 DEBUG: Multiple result: {multiple_result}")
+        
+        if not multiple_result['recommendations']:
+            return {
+                "error": "No interventions found with sufficient similarity to your profile. Please try providing more detailed information about your symptoms and goals.",
+                "intake_summary": build_intake_summary(user_input)
+            }
+        
+        # Generate personalized explanations for each intervention
+        print("🔍 DEBUG: Generating explanations for interventions...")
+        explanations = generate_batch_explanations(user_input, multiple_result['recommendations'])
+        print(f"🔍 DEBUG: Generated {len(explanations)} explanations")
+        
+        # Add explanations to each intervention
+        for i, intervention in enumerate(multiple_result['recommendations']):
+            if i < len(explanations):
+                intervention['why_recommended'] = explanations[i]
+            else:
+                intervention['why_recommended'] = f"This intervention matches your profile with {intervention.get('similarity_score', 0):.0%} compatibility."
+        
+        # Format the response with multiple interventions
+        formatted_result = {
+            "intake_summary": build_intake_summary(user_input),
+            "interventions": multiple_result['recommendations'],
+            "total_found": multiple_result['total_found'],
+            "min_similarity_used": multiple_result['min_similarity_used']
+        }
+        
+        # Calculate cycle phase for each intervention
+        cycle_phase = None
+        print(f"Debug: lastPeriod data: {user_input.lastPeriod}")
+        if (user_input.lastPeriod and 
+            user_input.lastPeriod.hasPeriod and 
+            user_input.lastPeriod.date and 
+            user_input.lastPeriod.cycleLength):
+            try:
+                print(f"Debug: Calculating cycle phase for date {user_input.lastPeriod.date}, length {user_input.lastPeriod.cycleLength}")
+                phase, days_since = calculate_cycle_phase(
+                    user_input.lastPeriod.date, 
+                    user_input.lastPeriod.cycleLength
+                )
+                print(f"Debug: Calculated phase: {phase}, days_since: {days_since}")
+                # Convert phase name to lowercase and remove 'phase' suffix
+                cycle_phase = phase.lower().replace(' ', '-').replace('phase', '').strip()
+                if cycle_phase.endswith('-'):
+                    cycle_phase = cycle_phase[:-1]
+                # Map to InFlo phase names
+                phase_mapping = {
+                    'follicular-': 'follicular',
+                    'ovulation-': 'ovulatory', 
+                    'luteal-': 'luteal',
+                    'menstrual-': 'menstrual',
+                    'pre-menstrual-': 'luteal'
+                }
+                cycle_phase = phase_mapping.get(cycle_phase, cycle_phase)
+                print(f"Debug: Final cycle_phase: {cycle_phase}")
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Could not calculate cycle phase: {e}")
+        else:
+            print("Debug: No cycle data available for phase calculation")
+        
+        # Add cycle phase information to the result
+        if cycle_phase:
+            formatted_result["cycle_phase"] = cycle_phase
+            # Get phase info for display
+            try:
+                from data.inflo_phase_data import get_phase_data
+                phase_data = get_phase_data(cycle_phase)
+                print(f"Debug: Phase data for {cycle_phase}: {phase_data}")
+                if phase_data and "phase_info" in phase_data:
+                    formatted_result["phase_info"] = {
+                        "name": phase_data["phase_info"]["name"],
+                        "description": phase_data["phase_info"]["description"],
+                        "duration": phase_data["phase_info"]["duration"],
+                        "energy_level": phase_data["phase_info"]["energy_level"],
+                        "hormonal_focus": phase_data["phase_info"]["hormonal_focus"]
+                    }
+                    print(f"Debug: Added phase_info to result")
+                else:
+                    print(f"Debug: No phase_info found for {cycle_phase}")
+            except Exception as e:
+                print(f"Debug: Error getting phase data: {e}")
+                # Don't fail the whole request for phase data issues
+        
+        print(f"Debug: Final result keys: {list(formatted_result.keys())}")
+        return formatted_result
+        
+    except Exception as e:
+        return {
+            "error": f"Error processing your request: {str(e)}",
+            "intake_summary": build_intake_summary(user_input),
+            "interventions": [],
+            "total_found": 0
+        }
 
-def get_recommendations(intake_data, df, top_k=3):
-    # Build the query string from the intake data dictionary
-    user_data_dict = intake_data.dict()
-    symptoms = ", ".join(user_data_dict.get('symptoms', []))
-    goals = ", ".join(user_data_dict.get('goals', []))
-    query_text = f"User is experiencing {symptoms} and has goals to {goals}."
+def build_text_from_structured_input(user_input: UserInput) -> str:
+    """
+    Build comprehensive text input from structured user data for RAG processing
+    
+    Args:
+        user_input: Structured UserInput object
+        
+    Returns:
+        Formatted text string for RAG processing
+    """
+    parts = []
+    
+    # Profile information
+    if user_input.profile.name:
+        parts.append(f"Name: {user_input.profile.name}")
+    parts.append(f"Age: {user_input.profile.age}")
+    
+    # Symptoms
+    if user_input.symptoms.selected:
+        parts.append(f"Symptoms: {', '.join(user_input.symptoms.selected)}")
+    if user_input.symptoms.additional:
+        parts.append(f"Additional symptoms: {user_input.symptoms.additional}")
+    
+    # Interventions
+    if user_input.interventions.selected:
+        intervention_texts = []
+        helpful_interventions = []
+        for intervention_item in user_input.interventions.selected:
+            intervention_texts.append(intervention_item.intervention)
+            if intervention_item.helpful:
+                helpful_interventions.append(intervention_item.intervention)
+        
+        parts.append(f"Tried interventions: {', '.join(intervention_texts)}")
+        if helpful_interventions:
+            parts.append(f"Helpful interventions: {', '.join(helpful_interventions)}")
+    
+    if user_input.interventions.additional:
+        parts.append(f"Additional intervention interests: {user_input.interventions.additional}")
+    
+    # Dietary preferences
+    if user_input.dietaryPreferences.selected:
+        parts.append(f"Dietary preferences: {', '.join(user_input.dietaryPreferences.selected)}")
+    if user_input.dietaryPreferences.additional:
+        parts.append(f"Additional dietary preferences: {user_input.dietaryPreferences.additional}")
+    
+    return " | ".join(parts)
 
-    # Use the global embeddings instance instead of creating a new one
-    query_embedding = embeddings.embed_query(query_text)
+def build_intake_summary(user_input: UserInput) -> str:
+    """
+    Build a warm, welcoming profile summary like a nutritional coach would write
+    
+    Args:
+        user_input: Structured UserInput object
+        
+    Returns:
+        Warm, personalized profile summary string with HTML bold tags for intake variables
+    """
+    name = user_input.profile.name if user_input.profile.name else "there"
+    
+    # Start with a warm greeting
+    summary_parts = [f"Hi {name}! I'm so glad you've taken this step towards better health."]
+    
+    # Acknowledge their challenges with empathy
+    if user_input.symptoms.selected:
+        symptom_list = ', '.join([f"<b>{symptom}</b>" for symptom in user_input.symptoms.selected])
+        summary_parts.append(f"I can see you're navigating {symptom_list} - I know these can feel overwhelming, but you're not alone in this journey.")
+    
+    # Acknowledge their efforts if they've tried interventions
+    if user_input.interventions.selected:
+        intervention_names = [f"<b>{item.intervention}</b>" for item in user_input.interventions.selected]
+        summary_parts.append(f"I appreciate that you've already explored {', '.join(intervention_names)} - every step you've taken matters.")
+    
+    # Acknowledge their dietary preferences with encouragement
+    if user_input.dietaryPreferences.selected:
+        dietary_prefs = ', '.join([f"<b>{pref}</b>" for pref in user_input.dietaryPreferences.selected])
+        summary_parts.append(f"Your {dietary_prefs} approach shows real commitment to nourishing your body well.")
+    
+    # Add cycle awareness if applicable
+    if user_input.lastPeriod:
+        if not user_input.lastPeriod.hasPeriod:
+            summary_parts.append("I understand that menstrual cycles aren't part of your experience, and that's completely valid - we'll focus on optimizing your overall hormonal health.")
+        elif (user_input.lastPeriod.hasPeriod and 
+              user_input.lastPeriod.date and 
+              user_input.lastPeriod.cycleLength):
+            try:
+                phase, days_since = calculate_cycle_phase(
+                    user_input.lastPeriod.date, 
+                    user_input.lastPeriod.cycleLength
+                )
+                cycle_info = format_cycle_info(phase, days_since, user_input.lastPeriod.cycleLength)
+                # Extract just the phase name for bolding
+                phase_name = phase.replace(' Phase', '').replace(' phase', '')
+                cycle_info_bold = cycle_info.lower().replace(phase_name.lower(), f"<b>{phase_name.lower()}</b>")
+                summary_parts.append(f"Based on your cycle timing, {cycle_info_bold} - this gives us valuable insight into your current hormonal landscape.")
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Could not calculate cycle phase: {e}")
+    
+    # End with encouragement
+    summary_parts.append("Together, we'll create a personalized approach that honors your unique needs and helps you feel your absolute best.")
+    
+    return " ".join(summary_parts)
 
-    # Prepare the strategy embeddings from the DataFrame
-    strategy_embeddings = np.array(df['embedding'].apply(eval).tolist())
-
-    # Calculate cosine similarity
-    similarities = cosine_similarity([query_embedding], strategy_embeddings)[0]
-
-    # Get top_k recommendations
-    top_indices = similarities.argsort()[-top_k:][::-1]
-    recommendations = df.iloc[top_indices]
-
-    return recommendations.to_dict(orient='records')
-
+def test_pipeline():
+    """Test the pipeline with sample input"""
+    test_input = "I have PCOS, irregular periods, and I'm struggling with weight gain. I want to manage my hormones naturally and lose weight. I'm also dealing with insulin resistance and fatigue."
+    
+    print("Testing RAG Pipeline...")
+    print(f"Input: {test_input}")
+    print("\nProcessing...")
+    
+    result = process_user_input(test_input)
+    
+    print("\nResult:")
+    print("=" * 50)
+    for key, value in result.items():
+        print(f"{key}: {value}")
 
 if __name__ == '__main__':
-    # This file is now used as a module, not for testing
-    pass
-
+    test_pipeline()

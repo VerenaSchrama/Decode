@@ -76,3 +76,6 @@ backend/data/vectorstore/*/index_metadata.pickle
 !backend/data/vectorstore/
 !backend/data/vectorstore/*/
 !backend/data/vectorstore/*/chroma.sqlite3
+
+
+
