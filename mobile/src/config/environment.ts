@@ -16,7 +16,7 @@ export const API_CONFIG = {
     retryAttempts: 3,
   },
   production: {
-    baseUrl: 'https://65.108.149.135',  // Changed to HTTPS
+    baseUrl: 'http://65.108.149.135',  // Reverted to HTTP temporarily
     timeout: 15000,
     retryAttempts: 2,
   },
