@@ -48,12 +48,19 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+origins = [
+    "http://localhost:3000",  # Local development
+    "http://localhost:8081",  # Expo development server
+    "https://decodev1.vercel.app",  # Replace with your actual Vercel URL
+    #"https://your-domain.com",  # Replace with your custom domain if you have one
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 # Response models
