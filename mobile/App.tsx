@@ -10,6 +10,7 @@ import { StoryIntakeData } from './src/types/StoryIntake';
 import { colors } from './src/constants/colors';
 import { ToastProvider } from './src/contexts/ToastContext';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { TempUserProvider } from './src/contexts/TempUserContext';
 
 // Main App Component with Authentication
 function AppContent() {
@@ -166,11 +167,13 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <ToastProvider>
-        <NavigationContainer>
-          <AppContent />
-        </NavigationContainer>
-      </ToastProvider>
+      <TempUserProvider>
+        <ToastProvider>
+          <NavigationContainer>
+            <AppContent />
+          </NavigationContainer>
+        </ToastProvider>
+      </TempUserProvider>
     </AuthProvider>
   );
 }

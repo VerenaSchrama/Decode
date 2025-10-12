@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,13 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 import { StoryIntakeData } from '../types/StoryIntake';
 import { colors } from '../constants/colors';
+import { useAuth } from '../contexts/AuthContext';
+import { useTempUser } from '../contexts/TempUserContext';
 
 interface ThankYouScreenProps {
   onViewRecommendations: () => void;
@@ -17,6 +20,31 @@ interface ThankYouScreenProps {
 }
 
 export default function ThankYouScreen({ onViewRecommendations, intakeData }: ThankYouScreenProps) {
+  const { register } = useAuth();
+  const { tempUser, clearTempUser } = useTempUser();
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  const handleContinueToRecommendations = async () => {
+    if (!tempUser) {
+      console.error('No temporary user data found');
+      return;
+    }
+
+    setIsRegistering(true);
+    try {
+      // Register the user with the temporary data
+      await register(tempUser);
+      // Clear temporary user data
+      clearTempUser();
+      // Proceed to recommendations
+      onViewRecommendations();
+    } catch (error) {
+      console.error('Registration failed:', error);
+      // Handle error - user will see error message from AuthContext
+    } finally {
+      setIsRegistering(false);
+    }
+  };
   // Build welcoming profile summary like a nutritional coach
   const buildProfileSummary = () => {
     if (!intakeData) return "Hi there! I'm glad you've taken this step towards better health.";
@@ -134,10 +162,21 @@ export default function ThankYouScreen({ onViewRecommendations, intakeData }: Th
           </View>
         </View>
 
-        <TouchableOpacity style={styles.recommendationsButton} onPress={onViewRecommendations}>
-          <Text style={styles.recommendationsButtonText}>
-            View My Recommendations
-          </Text>
+        <TouchableOpacity 
+          style={[styles.recommendationsButton, isRegistering && styles.recommendationsButtonDisabled]} 
+          onPress={handleContinueToRecommendations}
+          disabled={isRegistering}
+        >
+          {isRegistering ? (
+            <>
+              <ActivityIndicator color="#FFFFFF" size="small" style={{ marginRight: 8 }} />
+              <Text style={styles.recommendationsButtonText}>Creating Your Account...</Text>
+            </>
+          ) : (
+            <Text style={styles.recommendationsButtonText}>
+              Continue to Recommendations
+            </Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -268,6 +307,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  recommendationsButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.7,
   },
   recommendationsButtonText: {
     fontSize: 18,

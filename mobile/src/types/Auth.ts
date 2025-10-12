@@ -1,3 +1,12 @@
+export interface TempUser {
+  email: string;
+  password: string;
+  name: string;
+  age?: number;
+  date_of_birth?: string;
+  anonymous: boolean;
+}
+
 export interface User {
   id: string;
   email: string;

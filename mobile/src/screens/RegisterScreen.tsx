@@ -13,8 +13,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
-import { useAuth } from '../contexts/AuthContext';
-import { RegisterRequest } from '../types/Auth';
+import { useTempUser } from '../contexts/TempUserContext';
+import { TempUser } from '../types/Auth';
 
 interface RegisterScreenProps {
   onNavigateToLogin: () => void;
@@ -22,22 +22,22 @@ interface RegisterScreenProps {
 }
 
 export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }: RegisterScreenProps) {
-  const { register, isLoading, error, clearError } = useAuth();
-  const [formData, setFormData] = useState<RegisterRequest>({
+  const { setTempUser } = useTempUser();
+  const [formData, setFormData] = useState<TempUser>({
     email: '',
     password: '',
-    confirmPassword: '',
     name: '',
     age: undefined,
     date_of_birth: '',
     anonymous: false,
   });
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Partial<RegisterRequest & { confirmPassword: string }>>({});
+  const [validationErrors, setValidationErrors] = useState<Partial<TempUser & { confirmPassword: string }>>({});
 
   const validateForm = (): boolean => {
-    const errors: Partial<RegisterRequest & { confirmPassword: string }> = {};
+    const errors: Partial<TempUser & { confirmPassword: string }> = {};
 
     if (!formData.name.trim()) {
       errors.name = 'Name is required';
@@ -57,9 +57,9 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
       errors.password = 'Password must be at least 6 characters';
     }
 
-    if (!formData.confirmPassword.trim()) {
+    if (!confirmPassword.trim()) {
       errors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
+    } else if (formData.password !== confirmPassword) {
       errors.confirmPassword = 'Passwords do not match';
     }
 
@@ -75,21 +75,21 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
     if (!validateForm()) return;
 
     try {
-      clearError();
-      
-      // Prepare data for API (exclude confirmPassword)
-      const { confirmPassword, ...registerData } = formData;
-      
-      await register(registerData);
+      // Store temporary user data and proceed to intake flow
+      setTempUser(formData);
       onRegisterSuccess();
     } catch (error) {
-      // Error is handled by AuthContext
-      console.error('Registration error:', error);
+      console.error('Error storing temporary user data:', error);
+      Alert.alert('Error', 'Failed to save your information. Please try again.');
     }
   };
 
-  const handleInputChange = (field: keyof RegisterRequest | 'confirmPassword', value: string | number | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof TempUser | 'confirmPassword', value: string | number | boolean) => {
+    if (field === 'confirmPassword') {
+      setConfirmPassword(value as string);
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
     // Clear validation error when user starts typing
     if (validationErrors[field as keyof typeof validationErrors]) {
       setValidationErrors(prev => ({ ...prev, [field]: undefined }));
@@ -214,7 +214,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
                   style={styles.input}
                   placeholder="Confirm your password"
                   placeholderTextColor="#9CA3AF"
-                  value={formData.confirmPassword}
+                  value={confirmPassword}
                   onChangeText={(value) => handleInputChange('confirmPassword', value)}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
@@ -236,25 +236,12 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
               )}
             </View>
 
-            {/* Error Message */}
-            {error && (
-              <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={20} color="#EF4444" />
-                <Text style={styles.errorMessage}>{error.message}</Text>
-              </View>
-            )}
-
             {/* Register Button */}
             <TouchableOpacity
-              style={[styles.registerButton, isLoading && styles.registerButtonDisabled]}
+              style={styles.registerButton}
               onPress={handleRegister}
-              disabled={isLoading}
             >
-              {isLoading ? (
-                <Text style={styles.registerButtonText}>Creating Account...</Text>
-              ) : (
-                <Text style={styles.registerButtonText}>Create Account</Text>
-              )}
+              <Text style={styles.registerButtonText}>Continue to Health Assessment</Text>
             </TouchableOpacity>
           </View>
 
