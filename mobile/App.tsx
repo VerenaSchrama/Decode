@@ -16,6 +16,7 @@ function AppContent() {
   const [intakeData, setIntakeData] = useState<StoryIntakeData | undefined>();
   const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
   const [currentIntervention, setCurrentIntervention] = useState<any>(undefined);
+  const [isNewRegistration, setIsNewRegistration] = useState(false);
 
   const handleScreenChange = (screen: AppScreen) => {
     setCurrentScreen(screen);
@@ -35,21 +36,27 @@ function AppContent() {
 
   const handleLoginSuccess = () => {
     // Returning users go directly to main app
+    setIsNewRegistration(false);
     setCurrentScreen('main-app');
   };
 
   const handleRegisterSuccess = () => {
     // New users go to story intake
+    setIsNewRegistration(true);
     setCurrentScreen('story-intake');
   };
 
   // Handle initial routing when user is already authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      // If user is already authenticated (returning user), go to main app
-      setCurrentScreen('main-app');
+      // Only auto-route if this is NOT a new registration
+      // New registrations are handled by handleRegisterSuccess()
+      if (!isNewRegistration) {
+        // If user is already authenticated (returning user), go to main app
+        setCurrentScreen('main-app');
+      }
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, isNewRegistration]);
 
   // Show loading screen while checking authentication
   if (isLoading) {
