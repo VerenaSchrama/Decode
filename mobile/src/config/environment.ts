@@ -5,7 +5,6 @@
 
 export interface ApiConfig {
   baseUrl: string;
-  apiKey?: string;
   timeout: number;
   retryAttempts: number;
 }
@@ -18,13 +17,11 @@ export const API_CONFIG = {
   },
   production: {
     baseUrl: 'https://api.decode-app.nl',
-    apiKey: process.env.EXPO_PUBLIC_API_KEY || '',
     timeout: 15000,
     retryAttempts: 2,
   },
   staging: {
     baseUrl: 'https://api.decode-app.nl', // Same as production for now
-    apiKey: process.env.EXPO_PUBLIC_API_KEY || '',
     timeout: 12000, // 12 seconds
     retryAttempts: 3,
   }
