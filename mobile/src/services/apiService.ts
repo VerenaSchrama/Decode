@@ -115,6 +115,7 @@ class ApiService {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...(this.config.apiKey && { 'X-API-Key': this.config.apiKey }),
         ...options.headers,
       },
       signal: controller.signal,
