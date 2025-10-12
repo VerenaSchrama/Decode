@@ -87,8 +87,10 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
 
     try {
       console.log('Storing temporary user data...');
+      console.log('Form data to store:', formData);
       // Store temporary user data and proceed to intake flow
-      setTempUser(formData);
+      await setTempUser(formData);
+      console.log('Temporary user data stored successfully');
       console.log('Calling onRegisterSuccess...');
       onRegisterSuccess();
     } catch (error) {

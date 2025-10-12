@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,11 @@ export default function ThankYouScreen({ onViewRecommendations, intakeData }: Th
   const { register } = useAuth();
   const { tempUser, clearTempUser } = useTempUser();
   const [isRegistering, setIsRegistering] = useState(false);
+
+  // Debug: Log temp user data when component mounts
+  React.useEffect(() => {
+    console.log('ThankYouScreen: Component mounted, tempUser:', tempUser);
+  }, [tempUser]);
 
   const handleContinueToRecommendations = async () => {
     console.log('ThankYouScreen: handleContinueToRecommendations called');
