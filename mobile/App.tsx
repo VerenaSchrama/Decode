@@ -96,8 +96,8 @@ function AppContent() {
     );
   }
 
-  // Show authentication screens if not authenticated AND not in new registration flow
-  if (!isAuthenticated && !isNewRegistration) {
+  // Show authentication screens if not authenticated AND not in new registration flow AND not requiring email confirmation
+  if (!isAuthenticated && !isNewRegistration && !emailConfirmationRequired) {
     return (
       <View style={styles.container}>
         <AuthNavigator 
