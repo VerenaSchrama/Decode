@@ -62,6 +62,11 @@ function AppContent() {
       if (!isNewRegistration) {
         // If user is already authenticated (returning user), go to main app
         setCurrentScreen('main-app');
+      } else {
+        // If this is a new registration that just completed email verification,
+        // go to recommendations instead of main app
+        setCurrentScreen('recommendations');
+        setIsNewRegistration(false); // Reset the flag
       }
     }
   }, [isAuthenticated, isLoading, isNewRegistration]);
