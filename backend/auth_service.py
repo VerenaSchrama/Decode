@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from fastapi import HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 load_dotenv()
 
@@ -19,10 +19,40 @@ class UserRegistration(BaseModel):
     age: Optional[int] = None
     date_of_birth: Optional[str] = None
     anonymous: bool = False
+    
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        # Allow emails even if domain doesn't exist (for development/testing)
+        try:
+            from email_validator import validate_email
+            validate_email(v, check_deliverability=False)  # Don't check if domain exists
+            return v
+        except Exception:
+            # Fallback to basic email format validation
+            import re
+            if re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', v):
+                return v
+            raise ValueError('Invalid email format')
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        # Allow emails even if domain doesn't exist (for development/testing)
+        try:
+            from email_validator import validate_email
+            validate_email(v, check_deliverability=False)  # Don't check if domain exists
+            return v
+        except Exception:
+            # Fallback to basic email format validation
+            import re
+            if re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', v):
+                return v
+            raise ValueError('Invalid email format')
 
 class UserProfile(BaseModel):
     name: str
