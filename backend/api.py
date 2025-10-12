@@ -3,7 +3,7 @@ FastAPI service for HerFoodCode RAG Pipeline
 Simple API that takes user input and returns intervention recommendations
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List, Optional
@@ -1279,16 +1279,23 @@ async def update_user_profile(user_id: str, profile_data: UserProfile):
     return await auth_service.update_user_profile(user_id, profile_data)
 
 @app.post("/auth/verify")
-async def verify_token(access_token: str):
+async def verify_token(authorization: str = Header(None)):
     """
     Verify user's access token
     
     Args:
-        access_token: User's access token
+        authorization: Authorization header with Bearer token
         
     Returns:
         Token verification result
     """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header"
+        )
+    
+    access_token = authorization.split(" ")[1]
     return await auth_service.verify_token(access_token)
 
 if __name__ == "__main__":
