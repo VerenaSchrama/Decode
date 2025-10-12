@@ -72,11 +72,24 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
   };
 
   const handleRegister = async () => {
-    if (!validateForm()) return;
+    console.log('Register button clicked');
+    console.log('Form data:', formData);
+    console.log('Confirm password:', confirmPassword);
+    
+    const isValid = validateForm();
+    console.log('Form validation result:', isValid);
+    console.log('Validation errors:', validationErrors);
+    
+    if (!isValid) {
+      console.log('Form validation failed, not proceeding');
+      return;
+    }
 
     try {
+      console.log('Storing temporary user data...');
       // Store temporary user data and proceed to intake flow
       setTempUser(formData);
+      console.log('Calling onRegisterSuccess...');
       onRegisterSuccess();
     } catch (error) {
       console.error('Error storing temporary user data:', error);
