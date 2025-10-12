@@ -44,9 +44,13 @@ function AppContent() {
   };
 
   const handleRegisterSuccess = () => {
+    console.log('handleRegisterSuccess called');
+    console.log('Current screen before:', currentScreen);
     // New users go to story intake
     setIsNewRegistration(true);
     setCurrentScreen('story-intake');
+    console.log('Current screen after:', 'story-intake');
+    console.log('isNewRegistration set to:', true);
   };
 
   // Handle initial routing when user is already authenticated
@@ -107,6 +111,7 @@ function AppContent() {
   // Show main app if authenticated
   return (
     <View style={styles.container}>
+      {console.log('Rendering AppNavigator with currentScreen:', currentScreen)}
       <AppNavigator
         currentScreen={currentScreen}
         onScreenChange={handleScreenChange}
