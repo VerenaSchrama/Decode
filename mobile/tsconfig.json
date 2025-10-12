@@ -13,10 +13,14 @@
     "strictNullChecks": false,
     "jsx": "react-jsx",
     "allowJs": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "isolatedModules": true
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "App.tsx",
+    "index.ts"
   ],
   "exclude": [
     "node_modules",
