@@ -16,6 +16,8 @@ interface AuthNavigatorProps {
 }
 
 export default function AuthNavigator({ onLoginSuccess, onRegisterSuccess }: AuthNavigatorProps) {
+  console.log('AuthNavigator: Props received:', { onLoginSuccess: !!onLoginSuccess, onRegisterSuccess: !!onRegisterSuccess });
+  
   const [currentScreen, setCurrentScreen] = useState<'login' | 'register'>('login');
 
   const handleNavigateToRegister = () => {
@@ -31,7 +33,10 @@ export default function AuthNavigator({ onLoginSuccess, onRegisterSuccess }: Aut
   };
 
   const handleRegisterSuccess = () => {
+    console.log('AuthNavigator: handleRegisterSuccess called');
+    console.log('AuthNavigator: calling onRegisterSuccess...');
     onRegisterSuccess();
+    console.log('AuthNavigator: onRegisterSuccess called');
   };
 
   return (
