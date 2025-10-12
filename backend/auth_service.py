@@ -94,6 +94,7 @@ class AuthService:
                 "email": user_data.email,
                 "password": user_data.password,
                 "options": {
+                    "email_confirm": False,  # Disable email confirmation for development
                     "email_redirect_to": "https://decodev1.vercel.app/login",  # Redirect after confirmation
                     "data": {
                         "name": user_data.name,
@@ -159,7 +160,7 @@ class AuthService:
                     "refresh_token": auth_response.session.refresh_token if auth_response.session else None,
                     "expires_at": auth_response.session.expires_at if auth_response.session else None
                 },
-                "message": "User registered successfully"
+                "message": "User registered successfully. Email confirmation disabled for development."
             }
             
         except Exception as e:
