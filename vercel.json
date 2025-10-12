@@ -12,14 +12,11 @@
   "routes": [
     {
       "src": "/email-confirmed",
-      "dest": "/mobile/public/email-confirmed.html"
+      "dest": "/email-confirmed.html"
     },
     {
       "src": "/(.*)",
       "dest": "mobile/dist/$1"
     }
-  ],
-  "env": {
-    "NEXT_PUBLIC_ENV": "production"
-  }
+  ]
 }
