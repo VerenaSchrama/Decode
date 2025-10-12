@@ -96,8 +96,8 @@ function AppContent() {
     );
   }
 
-  // Show authentication screens if not authenticated
-  if (!isAuthenticated) {
+  // Show authentication screens if not authenticated AND not in new registration flow
+  if (!isAuthenticated && !isNewRegistration) {
     return (
       <View style={styles.container}>
         <AuthNavigator 
@@ -110,9 +110,9 @@ function AppContent() {
   }
 
   // Show main app if authenticated
+  console.log('Rendering AppNavigator with currentScreen:', currentScreen);
   return (
     <View style={styles.container}>
-      {console.log('Rendering AppNavigator with currentScreen:', currentScreen)}
       <AppNavigator
         currentScreen={currentScreen}
         onScreenChange={handleScreenChange}
