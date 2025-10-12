@@ -28,16 +28,15 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
     password: '',
     name: '',
     age: undefined,
-    date_of_birth: '',
     anonymous: false,
   });
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Partial<TempUser & { confirmPassword: string }>>({});
+  const [validationErrors, setValidationErrors] = useState<Partial<TempUser & { confirmPassword: string; age: string }>>({});
 
   const validateForm = (): boolean => {
-    const errors: Partial<TempUser & { confirmPassword: string }> = {};
+    const errors: Partial<TempUser & { confirmPassword: string; age: string }> = {};
 
     if (!formData.name.trim()) {
       errors.name = 'Name is required';
@@ -63,7 +62,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
       errors.confirmPassword = 'Passwords do not match';
     }
 
-    if (formData.age && (formData.age < 13 || formData.age > 120)) {
+    if (formData.age !== undefined && (formData.age < 13 || formData.age > 120)) {
       errors.age = 'Please enter a valid age';
     }
 
@@ -180,7 +179,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
                   placeholder="Enter your age"
                   placeholderTextColor="#9CA3AF"
                   value={formData.age?.toString() || ''}
-                  onChangeText={(value) => handleInputChange('age', value ? parseInt(value) : undefined)}
+                  onChangeText={(value) => handleInputChange('age', value ? parseInt(value, 10) : undefined)}
                   keyboardType="numeric"
                 />
               </View>

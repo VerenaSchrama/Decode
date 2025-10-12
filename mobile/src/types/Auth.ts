@@ -3,7 +3,6 @@ export interface TempUser {
   password: string;
   name: string;
   age?: number;
-  date_of_birth?: string;
   anonymous: boolean;
 }
 
@@ -12,7 +11,6 @@ export interface User {
   email: string;
   name: string;
   age?: number;
-  date_of_birth?: string;
   anonymous: boolean;
 }
 
@@ -32,7 +30,6 @@ export interface RegisterRequest {
   password: string;
   name: string;
   age?: number;
-  date_of_birth?: string;
   anonymous: boolean;
 }
 

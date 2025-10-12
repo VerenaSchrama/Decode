@@ -21,7 +21,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
   const [formData, setFormData] = useState<StoryIntakeData>({
     profile: { 
       name: tempUser?.name || '', // Pre-populate with name from registration
-      dateOfBirth: tempUser?.date_of_birth || '' 
+      dateOfBirth: '' // No longer using date_of_birth from registration
     },
     lastPeriod: { date: '', hasPeriod: true, cycleLength: undefined },
     symptoms: { selected: [], additional: '' },
