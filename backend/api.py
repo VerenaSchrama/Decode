@@ -52,7 +52,7 @@ origins = [
     "http://localhost:3000",  # Local development
     "http://localhost:8081",  # Expo development server
     "https://decodev1.vercel.app",  # Replace with your actual Vercel URL
-    "https://api.decode-app.nl",    # Your backend domain
+    #"https://your-domain.com",  # Replace with your custom domain if you have one
 ]
 
 app.add_middleware(
