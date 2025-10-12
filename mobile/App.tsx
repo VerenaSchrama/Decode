@@ -124,46 +124,6 @@ function AppContent() {
         onInterventionSelected={handleInterventionSelected}
       />
       
-      {/* Debug Navigation */}
-      <View style={styles.debugContainer}>
-        <TouchableOpacity
-          style={styles.debugButton}
-          onPress={() => setCurrentScreen('test')}
-        >
-          <Text style={styles.debugText}>Test</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.debugButton}
-          onPress={() => setCurrentScreen('story-intake')}
-        >
-          <Text style={styles.debugText}>Story</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.debugButton}
-          onPress={() => setCurrentScreen('thank-you')}
-        >
-          <Text style={styles.debugText}>Thanks</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.debugButton}
-          onPress={() => setCurrentScreen('recommendations')}
-        >
-          <Text style={styles.debugText}>Recs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.debugButton}
-          onPress={() => setCurrentScreen('habit-selection')}
-        >
-          <Text style={styles.debugText}>Habits</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.debugButton}
-          onPress={() => setCurrentScreen('main-app')}
-        >
-          <Text style={styles.debugText}>Main</Text>
-        </TouchableOpacity>
-      </View>
-      
       <StatusBar style="auto" />
     </View>
   );
@@ -198,29 +158,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#6B7280',
-  },
-  debugContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  debugButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginHorizontal: 2,
-    backgroundColor: colors.primary,
-    borderRadius: 4,
-    alignItems: 'center',
-  },
-  debugText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '500',
   },
 });
