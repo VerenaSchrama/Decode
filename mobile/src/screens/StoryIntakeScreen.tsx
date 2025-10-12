@@ -17,7 +17,7 @@ interface StoryIntakeScreenProps {
 
 export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps) {
   const { tempUser } = useTempUser();
-  const [currentStep, setCurrentStep] = useState(1); // Start at step 1 (DateOfBirthStep) instead of 0 (NameStep)
+  const [currentStep, setCurrentStep] = useState(2); // Start at step 2 (LastPeriodStep) instead of 0 (NameStep) and 1 (DateOfBirthStep)
   const [formData, setFormData] = useState<StoryIntakeData>({
     profile: { 
       name: tempUser?.name || '', // Pre-populate with name from registration
@@ -38,7 +38,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
   };
 
   const handleBack = () => {
-    if (currentStep > 1) { // Changed from 0 to 1 since we start at step 1
+    if (currentStep > 2) { // Changed from 1 to 2 since we start at step 2
       setCurrentStep(currentStep - 1);
     }
   };
@@ -53,15 +53,6 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
 
   const renderStepComponent = () => {
     switch (currentStep) {
-      case 1: // DateOfBirthStep (was case 1, now case 1)
-        return (
-          <DateOfBirthStep
-            data={formData}
-            onUpdate={handleUpdate}
-            onNext={handleNext}
-            onBack={handleBack}
-          />
-        );
       case 2: // LastPeriodStep (was case 2, now case 2)
         return (
           <LastPeriodStep
