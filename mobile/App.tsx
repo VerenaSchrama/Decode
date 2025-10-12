@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -11,7 +11,7 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
 // Main App Component with Authentication
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isNewUser } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('test');
   const [intakeData, setIntakeData] = useState<StoryIntakeData | undefined>();
   const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
@@ -34,9 +34,24 @@ function AppContent() {
   };
 
   const handleAuthSuccess = () => {
-    // Reset to main app after successful authentication
-    setCurrentScreen('main-app');
+    // Route new users to story intake, returning users to main app
+    if (isNewUser) {
+      setCurrentScreen('story-intake');
+    } else {
+      setCurrentScreen('main-app');
+    }
   };
+
+  // Handle initial routing when user is already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      // If user is already authenticated (returning user), go to main app
+      // If user just registered (isNewUser), they'll be routed via handleAuthSuccess
+      if (!isNewUser) {
+        setCurrentScreen('main-app');
+      }
+    }
+  }, [isAuthenticated, isLoading, isNewUser]);
 
   // Show loading screen while checking authentication
   if (isLoading) {

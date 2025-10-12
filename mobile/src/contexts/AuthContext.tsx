@@ -6,11 +6,12 @@ import authService from '../services/authService';
 // Auth Actions
 type AuthAction =
   | { type: 'AUTH_START' }
-  | { type: 'AUTH_SUCCESS'; payload: { user: User; session: AuthSession } }
+  | { type: 'AUTH_SUCCESS'; payload: { user: User; session: AuthSession; isNewUser?: boolean } }
   | { type: 'AUTH_FAILURE'; payload: AuthError }
   | { type: 'AUTH_LOGOUT' }
   | { type: 'AUTH_CLEAR_ERROR' }
-  | { type: 'AUTH_LOADING'; payload: boolean };
+  | { type: 'AUTH_LOADING'; payload: boolean }
+  | { type: 'AUTH_SET_NEW_USER'; payload: boolean };
 
 // Initial state
 const initialState: AuthState = {
@@ -19,6 +20,7 @@ const initialState: AuthState = {
   session: null,
   isLoading: true,
   error: null,
+  isNewUser: false,
 };
 
 // Auth reducer
@@ -38,6 +40,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         session: action.payload.session,
         isLoading: false,
         error: null,
+        isNewUser: action.payload.isNewUser || false,
       };
     case 'AUTH_FAILURE':
       return {
@@ -56,6 +59,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         session: null,
         isLoading: false,
         error: null,
+        isNewUser: false,
       };
     case 'AUTH_LOADING':
       return {
@@ -66,6 +70,11 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
       return {
         ...state,
         error: null,
+      };
+    case 'AUTH_SET_NEW_USER':
+      return {
+        ...state,
+        isNewUser: action.payload,
       };
     default:
       return state;
@@ -170,7 +179,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       dispatch({
         type: 'AUTH_SUCCESS',
-        payload: { user: response.user, session: response.session },
+        payload: { user: response.user, session: response.session, isNewUser: false },
       });
     } catch (error) {
       const authError: AuthError = {
@@ -192,7 +201,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       dispatch({
         type: 'AUTH_SUCCESS',
-        payload: { user: response.user, session: response.session },
+        payload: { user: response.user, session: response.session, isNewUser: true },
       });
     } catch (error) {
       const authError: AuthError = {
