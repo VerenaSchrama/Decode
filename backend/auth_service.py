@@ -64,7 +64,7 @@ class AuthService:
                 "email": user_data.email,
                 "password": user_data.password,
                 "options": {
-                    "email_confirm": False,  # Disable email confirmation
+                    "email_redirect_to": "https://decodev1.vercel.app/login",  # Redirect after confirmation
                     "data": {
                         "name": user_data.name,
                         "age": user_data.age,
