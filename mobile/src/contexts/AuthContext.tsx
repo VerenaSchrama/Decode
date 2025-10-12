@@ -11,7 +11,8 @@ type AuthAction =
   | { type: 'AUTH_LOGOUT' }
   | { type: 'AUTH_CLEAR_ERROR' }
   | { type: 'AUTH_LOADING'; payload: boolean }
-  | { type: 'EMAIL_CONFIRMATION_REQUIRED'; payload: { user: User; message: string } };
+  | { type: 'EMAIL_CONFIRMATION_REQUIRED'; payload: { user: User; message: string } }
+  | { type: 'CLEAR_EMAIL_CONFIRMATION' };
 
 // Initial state
 const initialState: AuthState = {
@@ -52,6 +53,14 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         error: null,
         emailConfirmationRequired: true,
       };
+    case 'CLEAR_EMAIL_CONFIRMATION':
+      return {
+        ...state,
+        emailConfirmationRequired: false,
+        user: null,
+        session: null,
+        isAuthenticated: false,
+      };
     case 'AUTH_FAILURE':
       return {
         ...state,
@@ -91,6 +100,7 @@ interface AuthContextType extends AuthState {
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  clearEmailConfirmation: () => void;
   refreshUser: () => Promise<void>;
 }
 
@@ -245,6 +255,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     dispatch({ type: 'AUTH_CLEAR_ERROR' });
   };
 
+  const clearEmailConfirmation = () => {
+    dispatch({ type: 'CLEAR_EMAIL_CONFIRMATION' });
+  };
+
   const refreshUser = async () => {
     if (!state.user?.id || !state.session?.access_token) return;
 
@@ -271,6 +285,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     register,
     logout,
     clearError,
+    clearEmailConfirmation,
     refreshUser,
   };
 

@@ -94,7 +94,7 @@ class AuthService:
                 "email": user_data.email,
                 "password": user_data.password,
                 "options": {
-                    "email_redirect_to": "https://decodev1.vercel.app/email-confirmed",  # Redirect after confirmation
+                    "email_redirect_to": "https://decodev1.vercel.app/email-confirmed",  # Fixed URL
                     "data": {
                         "name": user_data.name,
                         "age": user_data.age,
@@ -110,39 +110,23 @@ class AuthService:
                     detail="Failed to create user account"
                 )
             
-            # Check if profile already exists (created by trigger)
-            if self.service_client:
-                existing_profile = self.service_client.table('user_profiles').select('*').eq('user_uuid', auth_response.user.id).execute()
-            else:
-                existing_profile = self.client.table('user_profiles').select('*').eq('user_uuid', auth_response.user.id).execute()
+            # Always create/update profile using service client to bypass RLS
+            profile_data = {
+                "user_uuid": auth_response.user.id,
+                "email": user_data.email,
+                "name": user_data.name,
+                "age": user_data.age,
+                "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
+                "anonymous": user_data.anonymous
+            }
             
-            if existing_profile.data:
-                # Profile already exists (created by trigger), update it with additional data
-                profile_data = {
-                    "name": user_data.name,
-                    "age": user_data.age,
-                    "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
-                    "anonymous": user_data.anonymous
-                }
-                
-                if self.service_client:
-                    profile_result = self.service_client.table('user_profiles').update(profile_data).eq('user_uuid', auth_response.user.id).execute()
-                else:
-                    profile_result = self.client.table('user_profiles').update(profile_data).eq('user_uuid', auth_response.user.id).execute()
+            if self.service_client:
+                # Use upsert to handle both insert and update cases
+                # This will insert if not exists, update if exists
+                profile_result = self.service_client.table('user_profiles').upsert(profile_data).execute()
             else:
-                # Profile doesn't exist, create it
-                profile_data = {
-                    "user_uuid": auth_response.user.id,
-                    "name": user_data.name,
-                    "age": user_data.age,
-                    "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
-                    "anonymous": user_data.anonymous
-                }
-                
-                if self.service_client:
-                    profile_result = self.service_client.table('user_profiles').insert(profile_data).execute()
-                else:
-                    profile_result = self.client.table('user_profiles').insert(profile_data).execute()
+                # Fallback to regular client (may fail due to RLS)
+                profile_result = self.client.table('user_profiles').upsert(profile_data).execute()
             
             return {
                 "success": True,
@@ -160,10 +144,45 @@ class AuthService:
             }
             
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Registration failed: {str(e)}"
-            )
+            # Handle specific Supabase errors
+            error_message = str(e)
+            if "User already registered" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="An account with this email already exists. Please try logging in instead."
+                )
+            elif "Password should be at least" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Password must be at least 6 characters long."
+                )
+            elif "Invalid email" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Please enter a valid email address."
+                )
+            elif "duplicate key value violates unique constraint" in error_message:
+                # This happens when the user profile already exists (created by trigger)
+                # This is actually a success case - user was created, profile exists
+                return {
+                    "success": True,
+                    "user": {
+                        "id": auth_response.user.id,
+                        "email": auth_response.user.email,
+                        "name": user_data.name,
+                        "age": user_data.age,
+                        "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
+                        "anonymous": user_data.anonymous
+                    },
+                    "session": None,  # No session until email is confirmed
+                    "email_confirmation_required": True,
+                    "message": "Registration successful! Please check your email and click the confirmation link to complete your account setup."
+                }
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Registration failed: {error_message}"
+                )
     
     async def login_user(self, login_data: UserLogin) -> Dict[str, Any]:
         """
@@ -186,6 +205,13 @@ class AuthService:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid email or password"
+                )
+            
+            # Check if user's email is confirmed
+            if not auth_response.user.email_confirmed_at:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Please check your email and click the confirmation link to verify your account before logging in."
                 )
             
             # Get user profile using service client (bypasses RLS)
@@ -223,10 +249,22 @@ class AuthService:
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Login failed: {str(e)}"
-            )
+            error_message = str(e)
+            if "Invalid login credentials" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid email or password"
+                )
+            elif "Email not confirmed" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Please check your email and click the confirmation link to verify your account before logging in."
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"Login failed: {error_message}"
+                )
     
     async def logout_user(self, access_token: str) -> Dict[str, Any]:
         """
@@ -374,6 +412,7 @@ class AuthService:
                 "success": True,
                 "user_id": user.id,
                 "email": user.email,
+                "email_confirmed": bool(user.email_confirmed_at),
                 "message": "Token is valid"
             }
             
@@ -382,6 +421,49 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Token verification failed: {str(e)}"
             )
+    
+    async def resend_confirmation_email(self, email: str) -> Dict[str, Any]:
+        """
+        Resend email confirmation for a user
+        
+        Args:
+            email: User's email address
+            
+        Returns:
+            Confirmation email status
+        """
+        try:
+            # Resend confirmation email
+            result = self.client.auth.resend({
+                "type": "signup",
+                "email": email,
+                "options": {
+                    "email_redirect_to": "https://decodev1.vercel.app/email-confirmed"
+                }
+            })
+            
+            return {
+                "success": True,
+                "message": "Confirmation email sent successfully. Please check your inbox."
+            }
+            
+        except Exception as e:
+            error_message = str(e)
+            if "User not found" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No account found with this email address."
+                )
+            elif "Email already confirmed" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="This email address has already been confirmed."
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to resend confirmation email: {error_message}"
+                )
 
 # Create global auth service instance
 auth_service = AuthService()

@@ -8,13 +8,14 @@ import EmailConfirmationScreen from './src/screens/EmailConfirmationScreen';
 import EmailConfirmedScreen from './src/screens/EmailConfirmedScreen';
 import { StoryIntakeData } from './src/types/StoryIntake';
 import { colors } from './src/constants/colors';
-import { ToastProvider } from './src/contexts/ToastContext';
+import { ToastProvider, useToast } from './src/contexts/ToastContext';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { TempUserProvider } from './src/contexts/TempUserContext';
 
 // Main App Component with Authentication
 function AppContent() {
-  const { isAuthenticated, isLoading, emailConfirmationRequired, user } = useAuth();
+  const { isAuthenticated, isLoading, emailConfirmationRequired, user, clearEmailConfirmation } = useAuth();
+  const toast = useToast();
   console.log('AppContent: Auth state:', { isAuthenticated, isLoading, emailConfirmationRequired, user: user?.email });
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('test');
   const [intakeData, setIntakeData] = useState<StoryIntakeData | undefined>();
@@ -87,12 +88,34 @@ function AppContent() {
       <View style={styles.container}>
         <EmailConfirmationScreen 
           email={user?.email}
-          onResendEmail={() => {
-            // TODO: Implement resend email functionality
-            console.log('Resend email requested');
+          onResendEmail={async () => {
+            try {
+              console.log('Resending confirmation email to:', user?.email);
+              // Call the backend API to resend confirmation email
+              const response = await fetch('https://api.decode-app.nl/auth/resend-confirmation', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: user?.email }),
+              });
+              
+              if (response.ok) {
+                console.log('Confirmation email resent successfully');
+                toast.showToast('Confirmation email sent! Please check your inbox.', 'success');
+              } else {
+                console.error('Failed to resend confirmation email');
+                toast.showToast('Failed to resend email. Please try again.', 'error');
+              }
+            } catch (error) {
+              console.error('Error resending confirmation email:', error);
+              toast.showToast('Network error. Please check your connection and try again.', 'error');
+            }
           }}
           onBackToLogin={() => {
             // Reset email confirmation state and go back to login
+            console.log('Going back to login');
+            clearEmailConfirmation();
             setCurrentScreen('test');
           }}
         />

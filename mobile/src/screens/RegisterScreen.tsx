@@ -63,7 +63,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
     }
 
     if (formData.age !== undefined && (formData.age < 13 || formData.age > 120)) {
-      errors.age = 'Please enter a valid age';
+      (errors as any).age = 'Please enter a valid age';
     }
 
     setValidationErrors(errors);

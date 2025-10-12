@@ -3,7 +3,7 @@ FastAPI service for HerFoodCode RAG Pipeline
 Simple API that takes user input and returns intervention recommendations
 """
 
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List, Optional
@@ -1277,6 +1277,19 @@ async def update_user_profile(user_id: str, profile_data: UserProfile):
         Updated profile data
     """
     return await auth_service.update_user_profile(user_id, profile_data)
+
+@app.post("/auth/resend-confirmation")
+async def resend_confirmation_email(email: str):
+    """
+    Resend email confirmation for a user
+    
+    Args:
+        email: User's email address
+        
+    Returns:
+        Confirmation email status
+    """
+    return await auth_service.resend_confirmation_email(email)
 
 @app.post("/auth/verify")
 async def verify_token(authorization: str = Header(None)):
