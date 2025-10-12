@@ -94,8 +94,7 @@ class AuthService:
                 "email": user_data.email,
                 "password": user_data.password,
                 "options": {
-                    "email_confirm": False,  # Disable email confirmation for development
-                    "email_redirect_to": "https://decodev1.vercel.app/login",  # Redirect after confirmation
+                    "email_redirect_to": "https://decodev1.vercel.app/email-confirmed",  # Redirect after confirmation
                     "data": {
                         "name": user_data.name,
                         "age": user_data.age,
@@ -155,12 +154,9 @@ class AuthService:
                     "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
                     "anonymous": user_data.anonymous
                 },
-                "session": {
-                    "access_token": auth_response.session.access_token if auth_response.session else None,
-                    "refresh_token": auth_response.session.refresh_token if auth_response.session else None,
-                    "expires_at": auth_response.session.expires_at if auth_response.session else None
-                },
-                "message": "User registered successfully. Email confirmation disabled for development."
+                "session": None,  # No session until email is confirmed
+                "email_confirmation_required": True,
+                "message": "Registration successful! Please check your email and click the confirmation link to complete your account setup."
             }
             
         except Exception as e:

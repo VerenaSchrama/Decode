@@ -10,7 +10,8 @@ type AuthAction =
   | { type: 'AUTH_FAILURE'; payload: AuthError }
   | { type: 'AUTH_LOGOUT' }
   | { type: 'AUTH_CLEAR_ERROR' }
-  | { type: 'AUTH_LOADING'; payload: boolean };
+  | { type: 'AUTH_LOADING'; payload: boolean }
+  | { type: 'EMAIL_CONFIRMATION_REQUIRED'; payload: { user: User; message: string } };
 
 // Initial state
 const initialState: AuthState = {
@@ -19,6 +20,7 @@ const initialState: AuthState = {
   session: null,
   isLoading: true,
   error: null,
+  emailConfirmationRequired: false,
 };
 
 // Auth reducer
@@ -38,6 +40,17 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         session: action.payload.session,
         isLoading: false,
         error: null,
+        emailConfirmationRequired: false,
+      };
+    case 'EMAIL_CONFIRMATION_REQUIRED':
+      return {
+        ...state,
+        isAuthenticated: false,
+        user: action.payload.user,
+        session: null,
+        isLoading: false,
+        error: null,
+        emailConfirmationRequired: true,
       };
     case 'AUTH_FAILURE':
       return {
@@ -188,12 +201,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const response = await authService.register(userData);
       
-      await storeAuth(response.user, response.session);
-      
-      dispatch({
-        type: 'AUTH_SUCCESS',
-        payload: { user: response.user, session: response.session },
-      });
+      if (response.email_confirmation_required) {
+        // Email confirmation required - don't store session, show confirmation screen
+        dispatch({
+          type: 'EMAIL_CONFIRMATION_REQUIRED',
+          payload: { user: response.user, message: response.message },
+        });
+      } else if (response.session) {
+        // Email already confirmed or confirmation disabled - proceed normally
+        await storeAuth(response.user, response.session);
+        dispatch({
+          type: 'AUTH_SUCCESS',
+          payload: { user: response.user, session: response.session },
+        });
+      } else {
+        // Unexpected case - no session and no confirmation required
+        throw new Error('Registration completed but no session available');
+      }
     } catch (error) {
       const authError: AuthError = {
         message: error instanceof Error ? error.message : 'Registration failed',

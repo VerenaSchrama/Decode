@@ -30,7 +30,8 @@ export interface RegisterRequest {
 export interface AuthResponse {
   success: boolean;
   user: User;
-  session: AuthSession;
+  session: AuthSession | null;
+  email_confirmation_required?: boolean;
   message: string;
 }
 
@@ -46,4 +47,5 @@ export interface AuthState {
   session: AuthSession | null;
   isLoading: boolean;
   error: AuthError | null;
+  emailConfirmationRequired: boolean;
 }

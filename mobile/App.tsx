@@ -4,6 +4,8 @@ import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'rea
 import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator, { AppScreen } from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
+import EmailConfirmationScreen from './src/screens/EmailConfirmationScreen';
+import EmailConfirmedScreen from './src/screens/EmailConfirmedScreen';
 import { StoryIntakeData } from './src/types/StoryIntake';
 import { colors } from './src/constants/colors';
 import { ToastProvider } from './src/contexts/ToastContext';
@@ -11,7 +13,7 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
 // Main App Component with Authentication
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, emailConfirmationRequired, user } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('test');
   const [intakeData, setIntakeData] = useState<StoryIntakeData | undefined>();
   const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
@@ -64,6 +66,26 @@ function AppContent() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  // Show email confirmation screen if email confirmation is required
+  if (emailConfirmationRequired) {
+    return (
+      <View style={styles.container}>
+        <EmailConfirmationScreen 
+          email={user?.email}
+          onResendEmail={() => {
+            // TODO: Implement resend email functionality
+            console.log('Resend email requested');
+          }}
+          onBackToLogin={() => {
+            // Reset email confirmation state and go back to login
+            setCurrentScreen('test');
+          }}
+        />
+        <StatusBar style="auto" />
       </View>
     );
   }
