@@ -15,6 +15,7 @@ import { TempUserProvider } from './src/contexts/TempUserContext';
 // Main App Component with Authentication
 function AppContent() {
   const { isAuthenticated, isLoading, emailConfirmationRequired, user } = useAuth();
+  console.log('AppContent: Auth state:', { isAuthenticated, isLoading, emailConfirmationRequired, user: user?.email });
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('test');
   const [intakeData, setIntakeData] = useState<StoryIntakeData | undefined>();
   const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
