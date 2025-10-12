@@ -90,7 +90,7 @@ class AuthService:
                 profile_data = {
                     "name": user_data.name,
                     "age": user_data.age,
-                    "date_of_birth": user_data.date_of_birth,
+                    "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
                     "anonymous": user_data.anonymous
                 }
                 
@@ -104,7 +104,7 @@ class AuthService:
                     "user_uuid": auth_response.user.id,
                     "name": user_data.name,
                     "age": user_data.age,
-                    "date_of_birth": user_data.date_of_birth,
+                    "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
                     "anonymous": user_data.anonymous
                 }
                 
@@ -120,7 +120,7 @@ class AuthService:
                     "email": auth_response.user.email,
                     "name": user_data.name,
                     "age": user_data.age,
-                    "date_of_birth": user_data.date_of_birth,
+                    "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
                     "anonymous": user_data.anonymous
                 },
                 "session": {
