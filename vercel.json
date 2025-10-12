@@ -12,7 +12,7 @@
   "routes": [
     {
       "src": "/email-confirmed",
-      "dest": "/email-confirmed.html"
+      "dest": "/api/email-confirmed"
     },
     {
       "src": "/(.*)",
