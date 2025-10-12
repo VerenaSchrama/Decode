@@ -37,15 +37,10 @@ const getEnvironment = (): keyof typeof API_CONFIG => {
   }
   
   // Check environment variables (React Native compatible)
-  // @ts-ignore - process may not be available in React Native
   if (typeof process !== 'undefined' && process.env) {
-    // @ts-ignore
     if (process.env.NEXT_PUBLIC_ENV === 'staging') return 'staging';
-    // @ts-ignore
     if (process.env.NEXT_PUBLIC_ENV === 'production') return 'production';
-    // @ts-ignore
     if (process.env.VERCEL_ENV === 'production') return 'production';
-    // @ts-ignore
     if (process.env.VERCEL_ENV === 'preview') return 'staging';
   }
   
