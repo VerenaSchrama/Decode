@@ -1,5 +1,4 @@
 {
-  "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": false,
     "target": "ES2018",
@@ -11,6 +10,16 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "noImplicitAny": false,
-    "strictNullChecks": false
-  }
+    "strictNullChecks": false,
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
