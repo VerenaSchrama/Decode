@@ -27,7 +27,8 @@ export const CycleLengthStep: React.FC<CycleLengthStepProps> = ({
   onNext,
   onBack,
 }) => {
-  const [cycleLength, setCycleLength] = useState(data.lastPeriod?.cycleLength?.toString() || '');
+  const [cycleLength, setCycleLength] = useState(data.lastPeriod?.cycleLength?.toString() || '28');
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleNext = () => {
     onUpdate({
@@ -78,7 +79,7 @@ export const CycleLengthStep: React.FC<CycleLengthStepProps> = ({
 
               <View style={styles.inputContainer}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, isFocused && styles.inputFocused]}
                   value={cycleLength}
                   onChangeText={setCycleLength}
                   placeholder="28"
@@ -87,6 +88,9 @@ export const CycleLengthStep: React.FC<CycleLengthStepProps> = ({
                   placeholderTextColor="#999"
                   returnKeyType="done"
                   onSubmitEditing={handleNext}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  autoFocus={true}
                 />
                 <Text style={styles.unit}>days</Text>
               </View>
@@ -184,6 +188,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.primary,
     paddingBottom: 8,
     minWidth: 80,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  inputFocused: {
+    borderBottomColor: colors.primary,
+    borderBottomWidth: 3,
   },
   unit: {
     fontSize: 24,
