@@ -25,6 +25,9 @@ export default function ThankYouScreen({ onViewRecommendations, intakeData }: Th
   const [isRegistering, setIsRegistering] = useState(false);
 
   const handleContinueToRecommendations = async () => {
+    console.log('ThankYouScreen: handleContinueToRecommendations called');
+    console.log('ThankYouScreen: tempUser:', tempUser);
+    
     if (!tempUser) {
       console.error('No temporary user data found');
       return;
@@ -32,10 +35,13 @@ export default function ThankYouScreen({ onViewRecommendations, intakeData }: Th
 
     setIsRegistering(true);
     try {
+      console.log('ThankYouScreen: Starting registration with tempUser:', tempUser);
       // Register the user with the temporary data
       await register(tempUser);
+      console.log('ThankYouScreen: Registration successful, clearing temp user');
       // Clear temporary user data
-      clearTempUser();
+      await clearTempUser();
+      console.log('ThankYouScreen: Temp user cleared');
       // Note: If email confirmation is required, AuthContext will handle showing the email confirmation screen
       // If no email confirmation needed, the user will be automatically authenticated and can proceed
       // We don't call onViewRecommendations() here anymore - let AuthContext handle the flow
