@@ -11,7 +11,7 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
 // Main App Component with Authentication
 function AppContent() {
-  const { isAuthenticated, isLoading, isNewUser } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('test');
   const [intakeData, setIntakeData] = useState<StoryIntakeData | undefined>();
   const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
@@ -33,25 +33,23 @@ function AppContent() {
     setCurrentIntervention(intervention);
   };
 
-  const handleAuthSuccess = () => {
-    // Route new users to story intake, returning users to main app
-    if (isNewUser) {
-      setCurrentScreen('story-intake');
-    } else {
-      setCurrentScreen('main-app');
-    }
+  const handleLoginSuccess = () => {
+    // Returning users go directly to main app
+    setCurrentScreen('main-app');
+  };
+
+  const handleRegisterSuccess = () => {
+    // New users go to story intake
+    setCurrentScreen('story-intake');
   };
 
   // Handle initial routing when user is already authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       // If user is already authenticated (returning user), go to main app
-      // If user just registered (isNewUser), they'll be routed via handleAuthSuccess
-      if (!isNewUser) {
-        setCurrentScreen('main-app');
-      }
+      setCurrentScreen('main-app');
     }
-  }, [isAuthenticated, isLoading, isNewUser]);
+  }, [isAuthenticated, isLoading]);
 
   // Show loading screen while checking authentication
   if (isLoading) {
@@ -67,7 +65,10 @@ function AppContent() {
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <AuthNavigator onAuthSuccess={handleAuthSuccess} />
+        <AuthNavigator 
+          onLoginSuccess={handleLoginSuccess}
+          onRegisterSuccess={handleRegisterSuccess}
+        />
         <StatusBar style="auto" />
       </View>
     );

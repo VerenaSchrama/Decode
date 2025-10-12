@@ -46,5 +46,4 @@ export interface AuthState {
   session: AuthSession | null;
   isLoading: boolean;
   error: AuthError | null;
-  isNewUser: boolean; // Track if user just registered
 }

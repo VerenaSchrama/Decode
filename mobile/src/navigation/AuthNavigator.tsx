@@ -11,10 +11,11 @@ export type AuthStackParamList = {
 const Stack = createStackNavigator<AuthStackParamList>();
 
 interface AuthNavigatorProps {
-  onAuthSuccess: () => void;
+  onLoginSuccess: () => void;
+  onRegisterSuccess: () => void;
 }
 
-export default function AuthNavigator({ onAuthSuccess }: AuthNavigatorProps) {
+export default function AuthNavigator({ onLoginSuccess, onRegisterSuccess }: AuthNavigatorProps) {
   const [currentScreen, setCurrentScreen] = useState<'login' | 'register'>('login');
 
   const handleNavigateToRegister = () => {
@@ -25,8 +26,12 @@ export default function AuthNavigator({ onAuthSuccess }: AuthNavigatorProps) {
     setCurrentScreen('login');
   };
 
-  const handleAuthSuccess = () => {
-    onAuthSuccess();
+  const handleLoginSuccess = () => {
+    onLoginSuccess();
+  };
+
+  const handleRegisterSuccess = () => {
+    onRegisterSuccess();
   };
 
   return (
@@ -34,12 +39,12 @@ export default function AuthNavigator({ onAuthSuccess }: AuthNavigatorProps) {
       {currentScreen === 'login' ? (
         <LoginScreen
           onNavigateToRegister={handleNavigateToRegister}
-          onLoginSuccess={handleAuthSuccess}
+          onLoginSuccess={handleLoginSuccess}
         />
       ) : (
         <RegisterScreen
           onNavigateToLogin={handleNavigateToLogin}
-          onRegisterSuccess={handleAuthSuccess}
+          onRegisterSuccess={handleRegisterSuccess}
         />
       )}
     </>
