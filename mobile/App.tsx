@@ -55,14 +55,13 @@ function AppContent() {
   // Handle initial routing when user is already authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      // If user is already authenticated (returning user), go to main app
+      // Only auto-route if this is NOT a new registration
+      // New registrations are handled by handleRegisterSuccess()
       if (!isNewRegistration) {
+        // If user is already authenticated (returning user), go to main app
         setCurrentScreen('main-app');
-      } else {
-        // If this is a new registration, go to recommendations
-        setCurrentScreen('recommendations');
-        setIsNewRegistration(false); // Reset the flag
       }
+      // If isNewRegistration is true, don't override the screen set by handleRegisterSuccess
     }
   }, [isAuthenticated, isLoading, isNewRegistration]);
 
