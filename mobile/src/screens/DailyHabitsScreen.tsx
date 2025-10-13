@@ -37,6 +37,7 @@ import { getPhaseAwareHabits } from '../services/phaseHabitsApi';
 import { DailyProgressAPI, HabitProgress as APIHabitProgress, MoodEntry as APIMoodEntry } from '../services/dailyProgressApi';
 import { apiService } from '../services/apiService';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 
 // Detailed phase information function
 const getDetailedPhaseInfo = (phase: string) => {
@@ -303,6 +304,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const [saveTimeoutId, setSaveTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [currentStreak, setCurrentStreak] = useState<number>(0);
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   const cyclePhaseService = CyclePhaseService.getInstance();
 
@@ -323,7 +325,10 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const loadCurrentStreak = async () => {
     try {
       console.log('🔄 Loading current streak...');
-      const streakResponse = await apiService.getHabitStreak('demo-user-123');
+      // Use authenticated user ID or fallback to demo user
+      const userId = user?.id || 'demo-user-123';
+      console.log('Using user ID:', userId);
+      const streakResponse = await apiService.getHabitStreak(userId);
       console.log('✅ Streak loaded:', streakResponse.current_streak);
       setCurrentStreak(streakResponse.current_streak);
     } catch (error) {
@@ -424,7 +429,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       } : undefined;
 
       await apiService.saveDailyProgress({
-        user_id: 'demo-user-123',
+        user_id: user?.id || 'demo-user-123',
         entry_date: today,
         habits: apiHabits,
         mood: apiMood,
@@ -432,7 +437,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       });
 
       // Update streak after saving
-      const streakResponse = await apiService.getHabitStreak('demo-user-123');
+      const streakResponse = await apiService.getHabitStreak(user?.id || 'demo-user-123');
       setCurrentStreak(streakResponse.current_streak);
       showToast('Progress saved successfully!', 'success');
 

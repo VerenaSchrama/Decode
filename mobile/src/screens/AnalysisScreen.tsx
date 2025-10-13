@@ -12,7 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import { DailyProgressAPI } from '../services/dailyProgressApi';
-import CustomInterventionScreen from './CustomInterventionScreen';
+import { useAuth } from '../contexts/AuthContext';
 
 interface AnalysisScreenProps {
   intakeData?: any;
@@ -27,6 +27,7 @@ export default function AnalysisScreen({
   selectedHabits,
   onNavigateToChat,
 }: AnalysisScreenProps) {
+  const { user } = useAuth();
   const [currentStreak, setCurrentStreak] = useState<number>(0);
   const [isLoadingStreak, setIsLoadingStreak] = useState(true);
   const [showCustomIntervention, setShowCustomIntervention] = useState(false);
@@ -34,7 +35,10 @@ export default function AnalysisScreen({
   const loadStreak = async () => {
     try {
       console.log('🔄 AnalysisScreen: Loading streak...');
-      const streakResponse = await DailyProgressAPI.getHabitStreak('demo-user-123');
+      // Use authenticated user ID or fallback to demo user
+      const userId = user?.id || 'demo-user-123';
+      console.log('Using user ID:', userId);
+      const streakResponse = await DailyProgressAPI.getHabitStreak(userId);
       console.log('✅ AnalysisScreen: Streak loaded:', streakResponse.current_streak);
       setCurrentStreak(streakResponse.current_streak);
     } catch (error) {
