@@ -12,6 +12,8 @@ import RenderHtml from 'react-native-render-html';
 import { getRecommendations } from '../services/api';
 import { StoryIntakeData } from '../types/StoryIntake';
 import InterventionPeriodScreen from './InterventionPeriodScreen';
+import { useAuth } from '../contexts/AuthContext';
+import { colors } from '../constants/colors';
 
 interface RecommendationsScreenProps {
   intakeData: StoryIntakeData;
@@ -69,6 +71,7 @@ interface RecommendationData {
 }
 
 export default function RecommendationsScreen({ intakeData, onBack, onHabitsSelected, onInterventionSelected }: RecommendationsScreenProps) {
+  const { session } = useAuth();
   const [recommendations, setRecommendations] = useState<RecommendationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +96,7 @@ export default function RecommendationsScreen({ intakeData, onBack, onHabitsSele
       setLoading(true);
       setError(null);
       console.log('📡 Calling getRecommendations API...');
-      const result = await getRecommendations(intakeData);
+      const result = await getRecommendations(intakeData, session?.access_token);
       console.log('📡 API result:', result);
       
       if (result.success) {

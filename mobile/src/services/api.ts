@@ -40,7 +40,7 @@ export const checkAPIHealth = async () => {
 };
 
 // Get recommendations
-export const getRecommendations = async (storyIntakeData: any) => {
+export const getRecommendations = async (storyIntakeData: any, accessToken?: string) => {
   try {
     // Calculate age from date of birth
     const calculateAge = (dateOfBirth: string) => {
@@ -101,7 +101,17 @@ export const getRecommendations = async (storyIntakeData: any) => {
     console.log('📤 Sending to API:', JSON.stringify(userInput, null, 2));
     console.log('🌐 API URL:', API_BASE_URL + endpoints.recommend);
     
-    const response = await api.post(endpoints.recommend, userInput);
+    // Include authentication token if provided
+    const headers: any = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+      console.log('🔐 Including authentication token');
+    }
+    
+    const response = await api.post(endpoints.recommend, userInput, { headers });
     console.log('✅ API Response received:', response.status);
     return {
       success: true,

@@ -242,7 +242,7 @@ async def review_custom_intervention(
         )
 
 @app.post("/recommend")
-async def recommend_intervention(user_input: UserInput):
+async def recommend_intervention(user_input: UserInput, authorization: str = Header(None)):
     """
     Get intervention recommendation based on structured user input
     
@@ -285,9 +285,27 @@ async def recommend_intervention(user_input: UserInput):
         # Collect user data in Supabase
         try:
             from simple_intake_service import simple_intake_service
+            from auth_service import AuthService
+            
+            # Extract user ID from authentication token if provided
+            user_id = None
+            if authorization and authorization.startswith("Bearer "):
+                try:
+                    access_token = authorization.split(" ")[1]
+                    auth_service = AuthService()
+                    # Verify token and get user info
+                    user_info = await auth_service.verify_token(access_token)
+                    if user_info and user_info.get("user"):
+                        user_id = user_info["user"]["id"]
+                        print(f"✅ Authenticated user ID: {user_id}")
+                    else:
+                        print("⚠️  Token verification failed, using anonymous user")
+                except Exception as e:
+                    print(f"⚠️  Token verification error: {e}, using anonymous user")
+            
             data_collection_result = simple_intake_service.process_intake_with_data_collection(
                 user_input, 
-                user_id=None,  # Will create anonymous user
+                user_id=user_id,  # Use authenticated user ID or None for anonymous
                 recommendation_data=result
             )
             result["data_collection"] = data_collection_result
