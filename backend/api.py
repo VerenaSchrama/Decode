@@ -477,18 +477,19 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'created_at': datetime.now().isoformat()
         }
         
-        # Store in database
-        # For now, use a simple mapping for demo users
-        # TODO: Fix schema to use user_uuid consistently
-        db_user_id = 1  # Default user ID for demo users
+        # Store in database using user_uuid (after migration)
+        # Map demo user to the UUID in user_profiles
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
         
-        if user_id != 'demo-user-123':
-            # For authenticated users, we need to create a mapping
-            # This is a temporary solution until we fix the schema
-            db_user_id = 1  # Use same ID for now
+        if user_id == 'demo-user-123':
+            db_user_uuid = demo_user_uuid
+        else:
+            # For authenticated users, use their actual UUID
+            # TODO: Implement proper user UUID lookup
+            db_user_uuid = demo_user_uuid  # Fallback to demo for now
         
         db_data = {
-            'user_id': db_user_id,
+            'user_uuid': db_user_uuid,
             'entry_date': entry_date,
             'habits_completed': [h['habit'] for h in completed_habits],  # Array of completed habit names
             'mood': mood.get('mood') if mood else None,
@@ -533,19 +534,25 @@ async def get_daily_progress(user_id: str, days: int = 7):
         import uuid
         import hashlib
         
-        # Convert demo user ID to a valid INTEGER (users table uses INTEGER id)
+        # Map user_id to user_uuid (after migration)
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        
         if user_id == 'demo-user-123':
-            user_id = 1  # Use existing user ID from database
+            db_user_uuid = demo_user_uuid
+        else:
+            # For authenticated users, use their actual UUID
+            # TODO: Implement proper user UUID lookup
+            db_user_uuid = demo_user_uuid  # Fallback to demo for now
         
         # Calculate date range
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days-1)
         
-        # Query daily entries
+        # Query daily entries using user_uuid
         try:
             result = supabase_client.client.table('daily_habit_entries')\
                 .select('*')\
-                .eq('user_id', user_id)\
+                .eq('user_uuid', db_user_uuid)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -590,15 +597,21 @@ async def get_habit_streak(user_id: str):
         import uuid
         import hashlib
         
-        # Convert demo user ID to a valid INTEGER (users table uses INTEGER id)
-        if user_id == 'demo-user-123':
-            user_id = 1  # Use existing user ID from database
+        # Map user_id to user_uuid (after migration)
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
         
-        # Get recent entries
+        if user_id == 'demo-user-123':
+            db_user_uuid = demo_user_uuid
+        else:
+            # For authenticated users, use their actual UUID
+            # TODO: Implement proper user UUID lookup
+            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+        
+        # Get recent entries using user_uuid
         try:
             result = supabase_client.client.table('daily_habit_entries')\
                 .select('entry_date, completion_percentage')\
-                .eq('user_id', user_id)\
+                .eq('user_uuid', db_user_uuid)\
                 .gte('entry_date', (datetime.now().date() - timedelta(days=30)).isoformat())\
                 .order('entry_date', desc=True)\
                 .execute()
