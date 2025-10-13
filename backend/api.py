@@ -452,6 +452,9 @@ async def save_daily_progress(request: dict):
         total_habits = len(habits)
         completion_percentage = (len(completed_habits) / total_habits * 100) if total_habits > 0 else 0
         
+        print(f"DEBUG: Processing {total_habits} habits, {len(completed_habits)} completed")
+        print(f"DEBUG: Completed habits: {[h.get('habit', 'NO_HABIT_FIELD') for h in completed_habits]}")
+        
         # Prepare data for database
         entry_data = {
             'user_id': user_id,
@@ -470,7 +473,7 @@ async def save_daily_progress(request: dict):
         db_data = {
             'user_id': user_id,
             'entry_date': entry_date,
-            'habits_completed': [h['name'] for h in completed_habits],  # Array of completed habit names
+            'habits_completed': [h['habit'] for h in completed_habits],  # Array of completed habit names
             'mood': mood.get('mood') if mood else None,
             'notes': mood.get('notes', '') if mood else ''
         }
