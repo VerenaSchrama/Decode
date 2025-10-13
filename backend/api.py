@@ -419,12 +419,12 @@ async def get_phase_aware_habits(
         )
 
 @app.post("/daily-progress")
-async def save_daily_progress(request: dict):
+async def save_daily_progress(request: dict, authorization: str = Header(None)):
     """
     Save daily habit and mood progress
     
     Args:
-        user_id: User ID
+        user_id: User ID (can be demo-user-123 for testing)
         entry_date: Date in YYYY-MM-DD format
         habits: Array of habit objects with completion status
         mood: Mood entry object (optional)
@@ -439,9 +439,18 @@ async def save_daily_progress(request: dict):
         from datetime import datetime
         
         user_id = request.get('user_id', 'demo-user-123')
-        # Convert demo user ID to a valid INTEGER (users table uses INTEGER id)
+        
+        # For authenticated users, get their profile to use user_uuid
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                # TODO: Implement proper authentication
+                print("⚠️ Authentication not implemented yet, using demo user")
+            except Exception as e:
+                print(f"⚠️ Token verification error: {e}, using demo user")
+        
+        # For demo users, use simple mapping
         if user_id == 'demo-user-123':
-            user_id = 21  # Use existing user ID from database
+            user_id = 'demo-user-123'  # Keep as string for now
         entry_date = request.get('entry_date', datetime.now().strftime('%Y-%m-%d'))
         habits = request.get('habits', [])
         mood = request.get('mood', None)
@@ -469,9 +478,17 @@ async def save_daily_progress(request: dict):
         }
         
         # Store in database
-        # Prepare data with only existing columns
+        # For now, use a simple mapping for demo users
+        # TODO: Fix schema to use user_uuid consistently
+        db_user_id = 1  # Default user ID for demo users
+        
+        if user_id != 'demo-user-123':
+            # For authenticated users, we need to create a mapping
+            # This is a temporary solution until we fix the schema
+            db_user_id = 1  # Use same ID for now
+        
         db_data = {
-            'user_id': user_id,
+            'user_id': db_user_id,
             'entry_date': entry_date,
             'habits_completed': [h['habit'] for h in completed_habits],  # Array of completed habit names
             'mood': mood.get('mood') if mood else None,
@@ -518,7 +535,7 @@ async def get_daily_progress(user_id: str, days: int = 7):
         
         # Convert demo user ID to a valid INTEGER (users table uses INTEGER id)
         if user_id == 'demo-user-123':
-            user_id = 21  # Use existing user ID from database
+            user_id = 1  # Use existing user ID from database
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -575,8 +592,7 @@ async def get_habit_streak(user_id: str):
         
         # Convert demo user ID to a valid INTEGER (users table uses INTEGER id)
         if user_id == 'demo-user-123':
-            # Use a consistent integer ID for demo user
-            user_id = 1
+            user_id = 1  # Use existing user ID from database
         
         # Get recent entries
         try:
