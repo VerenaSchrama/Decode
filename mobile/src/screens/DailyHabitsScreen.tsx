@@ -300,6 +300,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const [isUpdatingHabits, setIsUpdatingHabits] = useState(false);
   const [interventionName, setInterventionName] = useState<string>('Control your blood sugar'); // Default intervention
   const [isSavingProgress, setIsSavingProgress] = useState(false);
+  const [saveTimeoutId, setSaveTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [currentStreak, setCurrentStreak] = useState<number>(0);
   const { showToast } = useToast();
 
@@ -309,6 +310,15 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   useEffect(() => {
     checkForPhaseChange();
   }, [route?.params?.intakeData]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutId) {
+        clearTimeout(saveTimeoutId);
+      }
+    };
+  }, [saveTimeoutId]);
 
   const loadCurrentStreak = async () => {
     try {
@@ -446,10 +456,16 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       return updated;
     });
     
-    // Save progress after a short delay to avoid too many API calls
-    setTimeout(() => {
+    // Clear existing timeout and set a new one to debounce saves
+    if (saveTimeoutId) {
+      clearTimeout(saveTimeoutId);
+    }
+    
+    const newTimeoutId = setTimeout(() => {
       saveProgressToAPI();
-    }, 500);
+    }, 1000); // Increased delay to 1 second for better debouncing
+    
+    setSaveTimeoutId(newTimeoutId);
   };
 
   const openMoodModal = () => {

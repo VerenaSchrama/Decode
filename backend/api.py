@@ -496,9 +496,16 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'notes': mood.get('notes', '') if mood else ''
         }
         
-        print(f"DEBUG: Attempting to insert data: {db_data}")
-        result = supabase_client.client.table('daily_habit_entries').upsert(db_data).execute()
-        print(f"DEBUG: Insert result: {result.data}")
+        print(f"DEBUG: Attempting to upsert data: {db_data}")
+        
+        # Use upsert with proper conflict resolution
+        # Supabase upsert works on primary key or unique constraints
+        result = supabase_client.client.table('daily_habit_entries').upsert(
+            db_data,
+            on_conflict='user_uuid,entry_date'  # Specify the unique constraint columns
+        ).execute()
+        
+        print(f"DEBUG: Upsert result: {result.data}")
         
         entry_id = result.data[0]['id'] if result.data else str(uuid.uuid4())
         
