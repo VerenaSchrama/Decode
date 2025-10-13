@@ -93,7 +93,23 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
       onRegisterSuccess();
     } catch (error) {
       console.error('Registration failed:', error);
-      Alert.alert('Registration Failed', 'Failed to create your account. Please try again.');
+      
+      // Show more specific error messages
+      let errorMessage = 'Failed to create your account. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('already exists')) {
+          errorMessage = 'An account with this email already exists. Please try logging in instead.';
+        } else if (error.message.includes('invalid email')) {
+          errorMessage = 'Please enter a valid email address.';
+        } else if (error.message.includes('password')) {
+          errorMessage = 'Password must be at least 6 characters long.';
+        } else {
+          errorMessage = `Registration failed: ${error.message}`;
+        }
+      }
+      
+      Alert.alert('Registration Failed', errorMessage);
     } finally {
       setIsRegistering(false);
     }
