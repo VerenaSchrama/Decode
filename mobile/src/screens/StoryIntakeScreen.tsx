@@ -9,26 +9,26 @@ import { SymptomsStep } from '../components/story-intake/SymptomsStep';
 import { InterventionsStep } from '../components/story-intake/InterventionsStep';
 import { DietaryStep } from '../components/story-intake/DietaryStep';
 import { ConsentStep } from '../components/story-intake/ConsentStep';
-import { useTempUser } from '../contexts/TempUserContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface StoryIntakeScreenProps {
   onComplete: (data: StoryIntakeData) => void;
 }
 
 export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps) {
-  const { tempUser } = useTempUser();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(2); // Start at step 2 (LastPeriodStep) instead of 0 (NameStep) and 1 (DateOfBirthStep)
   const [formData, setFormData] = useState<StoryIntakeData>({
     profile: { 
-      name: tempUser?.name || '', // Pre-populate with name from registration
-      dateOfBirth: '' // No longer using date_of_birth from registration
+      name: user?.name || '', // Pre-populate with name from authenticated user
+      dateOfBirth: '' // Will be collected during intake
     },
     lastPeriod: { date: '', hasPeriod: true, cycleLength: undefined },
     symptoms: { selected: [], additional: '' },
     interventions: { selected: [], additional: '' },
     dietaryPreferences: { selected: [], additional: '' },
     consent: false,
-    anonymous: tempUser?.anonymous || false,
+    anonymous: user?.anonymous || false,
   });
 
   const handleNext = () => {
