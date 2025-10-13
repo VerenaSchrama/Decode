@@ -4,19 +4,16 @@ import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'rea
 import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator, { AppScreen } from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
-import EmailConfirmationScreen from './src/screens/EmailConfirmationScreen';
-import EmailConfirmedScreen from './src/screens/EmailConfirmedScreen';
 import { StoryIntakeData } from './src/types/StoryIntake';
 import { colors } from './src/constants/colors';
 import { ToastProvider, useToast } from './src/contexts/ToastContext';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
-import { TempUserProvider } from './src/contexts/TempUserContext';
 
 // Main App Component with Authentication
 function AppContent() {
-  const { isAuthenticated, isLoading, emailConfirmationRequired, user, clearEmailConfirmation } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const toast = useToast();
-  console.log('AppContent: Auth state:', { isAuthenticated, isLoading, emailConfirmationRequired, user: user?.email });
+  console.log('AppContent: Auth state:', { isAuthenticated, isLoading });
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('test');
   const [intakeData, setIntakeData] = useState<StoryIntakeData | undefined>();
   const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
@@ -58,14 +55,11 @@ function AppContent() {
   // Handle initial routing when user is already authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      // Only auto-route if this is NOT a new registration
-      // New registrations are handled by handleRegisterSuccess()
+      // If user is already authenticated (returning user), go to main app
       if (!isNewRegistration) {
-        // If user is already authenticated (returning user), go to main app
         setCurrentScreen('main-app');
       } else {
-        // If this is a new registration that just completed email verification,
-        // go to recommendations instead of main app
+        // If this is a new registration, go to recommendations
         setCurrentScreen('recommendations');
         setIsNewRegistration(false); // Reset the flag
       }
@@ -82,50 +76,8 @@ function AppContent() {
     );
   }
 
-  // Show email confirmation screen if email confirmation is required
-  if (emailConfirmationRequired) {
-    return (
-      <View style={styles.container}>
-        <EmailConfirmationScreen 
-          email={user?.email}
-          onResendEmail={async () => {
-            try {
-              console.log('Resending confirmation email to:', user?.email);
-              // Call the backend API to resend confirmation email
-              const response = await fetch('https://api.decode-app.nl/auth/resend-confirmation', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email: user?.email }),
-              });
-              
-              if (response.ok) {
-                console.log('Confirmation email resent successfully');
-                toast.showToast('Confirmation email sent! Please check your inbox.', 'success');
-              } else {
-                console.error('Failed to resend confirmation email');
-                toast.showToast('Failed to resend email. Please try again.', 'error');
-              }
-            } catch (error) {
-              console.error('Error resending confirmation email:', error);
-              toast.showToast('Network error. Please check your connection and try again.', 'error');
-            }
-          }}
-          onBackToLogin={() => {
-            // Reset email confirmation state and go back to login
-            console.log('Going back to login');
-            clearEmailConfirmation();
-            setCurrentScreen('test');
-          }}
-        />
-        <StatusBar style="auto" />
-      </View>
-    );
-  }
-
-  // Show authentication screens if not authenticated AND not in new registration flow AND not requiring email confirmation
-  if (!isAuthenticated && !isNewRegistration && !emailConfirmationRequired) {
+  // Show authentication screens if not authenticated
+  if (!isAuthenticated) {
     return (
       <View style={styles.container}>
         <AuthNavigator 
@@ -161,13 +113,11 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <TempUserProvider>
-        <ToastProvider>
-          <NavigationContainer>
-            <AppContent />
-          </NavigationContainer>
-        </ToastProvider>
-      </TempUserProvider>
+      <ToastProvider>
+        <NavigationContainer>
+          <AppContent />
+        </NavigationContainer>
+      </ToastProvider>
     </AuthProvider>
   );
 }

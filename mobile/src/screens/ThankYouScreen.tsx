@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,10 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 import { StoryIntakeData } from '../types/StoryIntake';
 import { colors } from '../constants/colors';
-import { useAuth } from '../contexts/AuthContext';
-import { useTempUser } from '../contexts/TempUserContext';
 
 interface ThankYouScreenProps {
   onViewRecommendations: () => void;
@@ -20,44 +17,6 @@ interface ThankYouScreenProps {
 }
 
 export default function ThankYouScreen({ onViewRecommendations, intakeData }: ThankYouScreenProps) {
-  const { register } = useAuth();
-  const { tempUser, clearTempUser } = useTempUser();
-  const [isRegistering, setIsRegistering] = useState(false);
-
-  // Debug: Log temp user data when component mounts
-  React.useEffect(() => {
-    console.log('ThankYouScreen: Component mounted, tempUser:', tempUser);
-  }, [tempUser]);
-
-  const handleContinueToRecommendations = async () => {
-    console.log('ThankYouScreen: handleContinueToRecommendations called');
-    console.log('ThankYouScreen: tempUser:', tempUser);
-    
-    if (!tempUser) {
-      console.error('No temporary user data found');
-      return;
-    }
-
-    setIsRegistering(true);
-    try {
-      console.log('ThankYouScreen: Starting registration with tempUser:', tempUser);
-      // Register the user with the temporary data
-      await register(tempUser);
-      console.log('ThankYouScreen: Registration successful, clearing temp user');
-      // Clear temporary user data
-      await clearTempUser();
-      console.log('ThankYouScreen: Temp user cleared');
-      
-      // Note: AuthContext will automatically show email confirmation screen
-      // After email verification, user will be navigated to recommendations
-      // We don't call onViewRecommendations() here - let AuthContext handle the flow
-    } catch (error) {
-      console.error('Registration failed:', error);
-      // Handle error - user will see error message from AuthContext
-    } finally {
-      setIsRegistering(false);
-    }
-  };
   // Build welcoming profile summary like a nutritional coach
   const buildProfileSummary = () => {
     if (!intakeData) return "Hi there! I'm glad you've taken this step towards better health.";
@@ -176,20 +135,12 @@ export default function ThankYouScreen({ onViewRecommendations, intakeData }: Th
         </View>
 
         <TouchableOpacity 
-          style={[styles.recommendationsButton, isRegistering && styles.recommendationsButtonDisabled]} 
-          onPress={handleContinueToRecommendations}
-          disabled={isRegistering}
+          style={styles.recommendationsButton} 
+          onPress={onViewRecommendations}
         >
-          {isRegistering ? (
-            <>
-              <ActivityIndicator color="#FFFFFF" size="small" style={{ marginRight: 8 }} />
-              <Text style={styles.recommendationsButtonText}>Creating Your Account...</Text>
-            </>
-          ) : (
-            <Text style={styles.recommendationsButtonText}>
-              Continue to Recommendations
-            </Text>
-          )}
+          <Text style={styles.recommendationsButtonText}>
+            Continue to Recommendations
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -321,12 +272,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     alignItems: 'center',
-    flexDirection: 'row',
     justifyContent: 'center',
-  },
-  recommendationsButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-    opacity: 0.7,
   },
   recommendationsButtonText: {
     fontSize: 18,

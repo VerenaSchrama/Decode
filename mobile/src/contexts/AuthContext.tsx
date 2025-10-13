@@ -10,9 +10,7 @@ type AuthAction =
   | { type: 'AUTH_FAILURE'; payload: AuthError }
   | { type: 'AUTH_LOGOUT' }
   | { type: 'AUTH_CLEAR_ERROR' }
-  | { type: 'AUTH_LOADING'; payload: boolean }
-  | { type: 'EMAIL_CONFIRMATION_REQUIRED'; payload: { user: User; message: string } }
-  | { type: 'CLEAR_EMAIL_CONFIRMATION' };
+  | { type: 'AUTH_LOADING'; payload: boolean };
 
 // Initial state
 const initialState: AuthState = {
@@ -21,7 +19,6 @@ const initialState: AuthState = {
   session: null,
   isLoading: true,
   error: null,
-  emailConfirmationRequired: false,
 };
 
 // Auth reducer
@@ -41,25 +38,6 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         session: action.payload.session,
         isLoading: false,
         error: null,
-        emailConfirmationRequired: false,
-      };
-    case 'EMAIL_CONFIRMATION_REQUIRED':
-      return {
-        ...state,
-        isAuthenticated: false,
-        user: action.payload.user,
-        session: null,
-        isLoading: false,
-        error: null,
-        emailConfirmationRequired: true,
-      };
-    case 'CLEAR_EMAIL_CONFIRMATION':
-      return {
-        ...state,
-        emailConfirmationRequired: false,
-        user: null,
-        session: null,
-        isAuthenticated: false,
       };
     case 'AUTH_FAILURE':
       return {
@@ -100,7 +78,6 @@ interface AuthContextType extends AuthState {
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
-  clearEmailConfirmation: () => void;
   refreshUser: () => Promise<void>;
 }
 
@@ -211,23 +188,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const response = await authService.register(userData);
       
-      if (response.email_confirmation_required) {
-        // Email confirmation required - don't store session, show confirmation screen
-        dispatch({
-          type: 'EMAIL_CONFIRMATION_REQUIRED',
-          payload: { user: response.user, message: response.message },
-        });
-      } else if (response.session) {
-        // Email already confirmed or confirmation disabled - proceed normally
-        await storeAuth(response.user, response.session);
-        dispatch({
-          type: 'AUTH_SUCCESS',
-          payload: { user: response.user, session: response.session },
-        });
-      } else {
-        // Unexpected case - no session and no confirmation required
-        throw new Error('Registration completed but no session available');
-      }
+      // User is immediately authenticated after registration
+      await storeAuth(response.user, response.session);
+      
+      dispatch({
+        type: 'AUTH_SUCCESS',
+        payload: { user: response.user, session: response.session },
+      });
     } catch (error) {
       const authError: AuthError = {
         message: error instanceof Error ? error.message : 'Registration failed',
@@ -253,10 +220,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const clearError = () => {
     dispatch({ type: 'AUTH_CLEAR_ERROR' });
-  };
-
-  const clearEmailConfirmation = () => {
-    dispatch({ type: 'CLEAR_EMAIL_CONFIRMATION' });
   };
 
   const refreshUser = async () => {
@@ -285,7 +248,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     register,
     logout,
     clearError,
-    clearEmailConfirmation,
     refreshUser,
   };
 

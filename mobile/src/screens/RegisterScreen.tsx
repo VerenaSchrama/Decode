@@ -13,8 +13,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
-import { useTempUser } from '../contexts/TempUserContext';
-import { TempUser } from '../types/Auth';
+import { useAuth } from '../contexts/AuthContext';
+import { RegisterRequest } from '../types/Auth';
 
 interface RegisterScreenProps {
   onNavigateToLogin: () => void;
@@ -22,8 +22,8 @@ interface RegisterScreenProps {
 }
 
 export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }: RegisterScreenProps) {
-  const { setTempUser } = useTempUser();
-  const [formData, setFormData] = useState<TempUser>({
+  const { register } = useAuth();
+  const [formData, setFormData] = useState<RegisterRequest>({
     email: '',
     password: '',
     name: '',
@@ -33,10 +33,11 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Partial<TempUser & { confirmPassword: string; age: string }>>({});
+  const [validationErrors, setValidationErrors] = useState<Partial<RegisterRequest & { confirmPassword: string; age: string }>>({});
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const validateForm = (): boolean => {
-    const errors: Partial<TempUser & { confirmPassword: string; age: string }> = {};
+    const errors: Partial<RegisterRequest & { confirmPassword: string; age: string }> = {};
 
     if (!formData.name.trim()) {
       errors.name = 'Name is required';
@@ -84,21 +85,21 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
       return;
     }
 
+    setIsRegistering(true);
     try {
-      console.log('Storing temporary user data...');
-      console.log('Form data to store:', formData);
-      // Store temporary user data and proceed to intake flow
-      await setTempUser(formData);
-      console.log('Temporary user data stored successfully');
-      console.log('Calling onRegisterSuccess...');
+      console.log('Registering user with backend...');
+      await register(formData);
+      console.log('Registration successful, calling onRegisterSuccess');
       onRegisterSuccess();
     } catch (error) {
-      console.error('Error storing temporary user data:', error);
-      Alert.alert('Error', 'Failed to save your information. Please try again.');
+      console.error('Registration failed:', error);
+      Alert.alert('Registration Failed', 'Failed to create your account. Please try again.');
+    } finally {
+      setIsRegistering(false);
     }
   };
 
-  const handleInputChange = (field: keyof TempUser | 'confirmPassword', value: string | number | boolean) => {
+  const handleInputChange = (field: keyof RegisterRequest | 'confirmPassword', value: string | number | boolean) => {
     if (field === 'confirmPassword') {
       setConfirmPassword(value as string);
     } else {
@@ -251,11 +252,16 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
             </View>
 
             {/* Register Button */}
-            <TouchableOpacity
-              style={styles.registerButton}
+            <TouchableOpacity 
+              style={[styles.registerButton, isRegistering && styles.registerButtonDisabled]} 
               onPress={handleRegister}
+              disabled={isRegistering}
             >
-              <Text style={styles.registerButtonText}>Continue to Health Assessment</Text>
+              {isRegistering ? (
+                <Text style={styles.registerButtonText}>Creating Account...</Text>
+              ) : (
+                <Text style={styles.registerButtonText}>Continue to Health Assessment</Text>
+              )}
             </TouchableOpacity>
           </View>
 

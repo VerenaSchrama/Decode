@@ -94,7 +94,6 @@ class AuthService:
                 "email": user_data.email,
                 "password": user_data.password,
                 "options": {
-                    "email_redirect_to": "https://decodev1.vercel.app/email-confirmed",  # Fixed URL
                     "data": {
                         "name": user_data.name,
                         "age": user_data.age,
@@ -138,9 +137,13 @@ class AuthService:
                     "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
                     "anonymous": user_data.anonymous
                 },
-                "session": None,  # No session until email is confirmed
-                "email_confirmation_required": True,
-                "message": "Registration successful! Please check your email and click the confirmation link to complete your account setup."
+                "session": {
+                    "access_token": auth_response.session.access_token,
+                    "refresh_token": auth_response.session.refresh_token,
+                    "expires_at": auth_response.session.expires_at
+                },
+                "email_confirmation_required": False,
+                "message": "Registration successful! You can now continue with your health journey."
             }
             
         except Exception as e:
@@ -208,11 +211,7 @@ class AuthService:
                 )
             
             # Check if user's email is confirmed
-            if not auth_response.user.email_confirmed_at:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Please check your email and click the confirmation link to verify your account before logging in."
-                )
+                        # Email confirmation is no longer required
             
             # Get user profile using service client (bypasses RLS)
             if self.service_client:
@@ -423,47 +422,11 @@ class AuthService:
             )
     
     async def resend_confirmation_email(self, email: str) -> Dict[str, Any]:
-        """
-        Resend email confirmation for a user
-        
-        Args:
-            email: User's email address
-            
-        Returns:
-            Confirmation email status
-        """
-        try:
-            # Resend confirmation email
-            result = self.client.auth.resend({
-                "type": "signup",
-                "email": email,
-                "options": {
-                    "email_redirect_to": "https://decodev1.vercel.app/email-confirmed"
-                }
-            })
-            
-            return {
-                "success": True,
-                "message": "Confirmation email sent successfully. Please check your inbox."
-            }
-            
-        except Exception as e:
-            error_message = str(e)
-            if "User not found" in error_message:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="No account found with this email address."
-                )
-            elif "Email already confirmed" in error_message:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="This email address has already been confirmed."
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Failed to resend confirmation email: {error_message}"
-                )
+        """Deprecated: Email confirmation is no longer required"""
+        return {
+            "success": False,
+            "message": "Email confirmation is no longer required for this app."
+        }
 
 # Create global auth service instance
 auth_service = AuthService()

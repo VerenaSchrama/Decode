@@ -53,5 +53,4 @@ export interface AuthState {
   session: AuthSession | null;
   isLoading: boolean;
   error: AuthError | null;
-  emailConfirmationRequired: boolean;
 }
