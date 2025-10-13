@@ -48,9 +48,9 @@ export default function ThankYouScreen({ onViewRecommendations, intakeData }: Th
       await clearTempUser();
       console.log('ThankYouScreen: Temp user cleared');
       
-      // Navigate to recommendations after successful registration
-      console.log('ThankYouScreen: Navigating to recommendations');
-      onViewRecommendations();
+      // Note: AuthContext will automatically show email confirmation screen
+      // After email verification, user will be navigated to recommendations
+      // We don't call onViewRecommendations() here - let AuthContext handle the flow
     } catch (error) {
       console.error('Registration failed:', error);
       // Handle error - user will see error message from AuthContext
