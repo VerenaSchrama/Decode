@@ -7,6 +7,8 @@ import ThankYouScreen from '../screens/ThankYouScreen';
 import RecommendationsScreen from '../screens/RecommendationsScreen';
 import HabitSelectionScreen from '../screens/HabitSelectionScreen';
 import MainAppScreen from '../screens/MainAppScreen';
+import { interventionPeriodService } from '../services/interventionPeriodService';
+import { useAuth } from '../contexts/AuthContext';
 
 export type AppScreen = 'test' | 'story-intake' | 'thank-you' | 'recommendations' | 'habit-selection' | 'main-app';
 
@@ -31,6 +33,7 @@ export default function AppNavigator({
   currentIntervention,
   onInterventionSelected,
 }: AppNavigatorProps) {
+  const { session } = useAuth();
   const handleStoryIntakeComplete = (data: StoryIntakeData) => {
     onIntakeComplete(data);
     onScreenChange('thank-you');
@@ -58,7 +61,7 @@ export default function AppNavigator({
     onScreenChange('recommendations');
   };
 
-  const handleInterventionSelected = (intervention: any, periodData: {
+  const handleInterventionSelected = async (intervention: any, periodData: {
     durationDays: number;
     startDate: string;
     endDate: string;
@@ -73,6 +76,35 @@ export default function AppNavigator({
     // Extract habits from the selected intervention
     const interventionHabits = intervention.habits?.map((habit: any) => habit.description) || [];
     console.log('Intervention habits:', interventionHabits);
+    
+    // Start tracking intervention period if user is authenticated
+    if (session?.access_token && intakeData) {
+      try {
+        const startRequest = {
+          intake_id: intakeData.id || 'temp-intake-id', // Use intake ID if available
+          intervention_name: intervention.name,
+          selected_habits: interventionHabits,
+          intervention_id: intervention.id,
+          planned_duration_days: periodData.durationDays,
+          cycle_phase: intakeData.lastPeriod?.cyclePhase || 'follicular'
+        };
+        
+        const result = await interventionPeriodService.startInterventionPeriod(
+          startRequest,
+          session.access_token
+        );
+        
+        if (result.success) {
+          console.log('✅ Intervention period tracking started:', result.period_id);
+        } else {
+          console.warn('⚠️ Failed to start intervention period tracking:', result.error);
+        }
+      } catch (error) {
+        console.error('❌ Error starting intervention period tracking:', error);
+      }
+    } else {
+      console.log('ℹ️ Skipping intervention period tracking - no session or intake data');
+    }
     
     // Pass the habits to the habit selection screen
     onHabitsSelected?.(interventionHabits);

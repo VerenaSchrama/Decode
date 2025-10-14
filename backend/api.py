@@ -932,6 +932,178 @@ def build_user_context(intake_data: Optional[dict], current_intervention: Option
     return "\n".join(context_parts) if context_parts else "No specific user context available."
 
 # ============================================================================
+# INTERVENTION PERIOD TRACKING ENDPOINTS
+# ============================================================================
+
+@app.post("/intervention-periods/start")
+async def start_intervention_period(
+    request: dict,
+    authorization: str = Header(None)
+):
+    """Start tracking a new intervention period"""
+    try:
+        from intervention_period_service import intervention_period_service
+        from auth_service import AuthService
+        
+        # Extract user ID from authentication token
+        user_uuid = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("user"):
+                    user_uuid = user_info["user"]["id"]
+                    print(f"✅ Starting intervention for authenticated user: {user_uuid}")
+                else:
+                    print("⚠️ Token verification failed")
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Extract data from request
+        intake_id = request.get("intake_id")
+        intervention_name = request.get("intervention_name")
+        selected_habits = request.get("selected_habits", [])
+        intervention_id = request.get("intervention_id")
+        planned_duration_days = request.get("planned_duration_days", 30)
+        cycle_phase = request.get("cycle_phase")
+        
+        if not intake_id or not intervention_name:
+            raise HTTPException(status_code=400, detail="intake_id and intervention_name are required")
+        
+        # Start intervention period
+        result = intervention_period_service.start_intervention_period(
+            user_uuid=user_uuid,
+            intake_id=intake_id,
+            intervention_name=intervention_name,
+            selected_habits=selected_habits,
+            intervention_id=intervention_id,
+            planned_duration_days=planned_duration_days,
+            cycle_phase=cycle_phase
+        )
+        
+        if result["success"]:
+            return result
+        else:
+            raise HTTPException(status_code=500, detail=result.get("error", "Failed to start intervention period"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error starting intervention period: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@app.get("/intervention-periods/active")
+async def get_active_intervention_period(authorization: str = Header(None)):
+    """Get the currently active intervention period for the user"""
+    try:
+        from intervention_period_service import intervention_period_service
+        from auth_service import AuthService
+        
+        # Extract user ID from authentication token
+        user_uuid = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("user"):
+                    user_uuid = user_info["user"]["id"]
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Get active intervention period
+        result = intervention_period_service.get_active_intervention_period(user_uuid)
+        
+        if result["success"]:
+            return result
+        else:
+            raise HTTPException(status_code=500, detail=result.get("error", "Failed to get active intervention"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting active intervention: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@app.get("/intervention-periods/history")
+async def get_intervention_periods_history(authorization: str = Header(None)):
+    """Get all intervention periods for the user"""
+    try:
+        from intervention_period_service import intervention_period_service
+        from auth_service import AuthService
+        
+        # Extract user ID from authentication token
+        user_uuid = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("user"):
+                    user_uuid = user_info["user"]["id"]
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Get intervention periods history
+        result = intervention_period_service.get_user_intervention_periods(user_uuid)
+        
+        if result["success"]:
+            return result
+        else:
+            raise HTTPException(status_code=500, detail=result.get("error", "Failed to get intervention history"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting intervention history: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@app.put("/intervention-periods/{period_id}/complete")
+async def complete_intervention_period(
+    period_id: str,
+    request: dict,
+    authorization: str = Header(None)
+):
+    """Mark an intervention period as completed"""
+    try:
+        from intervention_period_service import intervention_period_service
+        
+        # Extract completion data
+        completion_percentage = request.get("completion_percentage", 100.0)
+        notes = request.get("notes")
+        
+        # Complete intervention period
+        result = intervention_period_service.complete_intervention_period(
+            period_id=period_id,
+            completion_percentage=completion_percentage,
+            notes=notes
+        )
+        
+        if result["success"]:
+            return result
+        else:
+            raise HTTPException(status_code=500, detail=result.get("error", "Failed to complete intervention"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error completing intervention: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+# ============================================================================
 # USER INTERVENTION ENDPOINTS
 # ============================================================================
 

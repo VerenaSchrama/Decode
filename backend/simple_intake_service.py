@@ -3,6 +3,7 @@ Simple intake service for collecting user data during recommendations
 """
 
 from typing import Dict, List, Optional
+import time
 from models import supabase_client, UserInput
 
 class SimpleIntakeService:
@@ -88,9 +89,31 @@ class SimpleIntakeService:
     def _create_anonymous_user(self, user_input: UserInput) -> str:
         """Create an anonymous user for data collection"""
         
-        # For demo purposes, use an existing user ID from the database
-        # This avoids the foreign key constraint issue
-        return "21"
+        # For authenticated users, we should use their actual user ID
+        # For anonymous users, we'll create a temporary user record
+        try:
+            # Try to create a user in user_profiles table
+            user_data = {
+                'name': user_input.profile.name or 'Anonymous User',
+                'email': f"anonymous_{int(time.time())}@temp.com",
+                'age': user_input.profile.age,
+                'date_of_birth': user_input.profile.dateOfBirth,
+                'anonymous': True,
+                'current_strategy': None
+            }
+            
+            result = self.supabase.client.table('user_profiles').insert(user_data).execute()
+            if result.data:
+                user_uuid = result.data[0]['user_uuid']
+                print(f"✅ Created anonymous user: {user_uuid}")
+                return user_uuid
+            else:
+                raise Exception("Failed to create user")
+                
+        except Exception as e:
+            print(f"⚠️ Failed to create anonymous user: {e}")
+            # Fallback to demo user UUID
+            return "117e24ea-3562-45f2-9256-f1b032d0d86b"
     
     def _process_previous_interventions(self, user_id: str, intake_id: str, interventions: List) -> None:
         """Process interventions the user has already tried"""
