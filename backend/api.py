@@ -133,8 +133,9 @@ async def root():
 async def health_check():
     """Detailed health check"""
     return {
+        "message": "HerFoodCode RAG API is running",
         "status": "healthy",
-        "rag_pipeline": "available" if RAG_AVAILABLE else "unavailable",
+        "rag_available": RAG_AVAILABLE,
         "openai_api_key": "set" if os.getenv("OPENAI_API_KEY") else "not_set"
     }
 
@@ -499,11 +500,22 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         print(f"DEBUG: Attempting to upsert data: {db_data}")
         
         # Use upsert with proper conflict resolution
-        # Supabase upsert works on primary key or unique constraints
-        result = supabase_client.client.table('daily_habit_entries').upsert(
-            db_data,
-            on_conflict='user_uuid,entry_date'  # Specify the unique constraint columns
-        ).execute()
+        # For Supabase, we need to handle the conflict manually
+        try:
+            # First try to insert
+            result = supabase_client.client.table('daily_habit_entries').insert(db_data).execute()
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                # If duplicate, update the existing record
+                result = supabase_client.client.table('daily_habit_entries').update({
+                    'habits_completed': db_data['habits_completed'],
+                    'mood': db_data['mood'],
+                    'notes': db_data['notes'],
+                    'completion_percentage': db_data.get('completion_percentage', 0.0),
+                    'updated_at': datetime.now().isoformat()
+                }).eq('user_uuid', db_data['user_uuid']).eq('entry_date', db_data['entry_date']).execute()
+            else:
+                raise e
         
         print(f"DEBUG: Upsert result: {result.data}")
         
