@@ -34,7 +34,7 @@ const MOOD_SYMPTOM_OPTIONS = [
 ];
 import { CyclePhaseService, CyclePhaseInfo } from '../services/cyclePhaseService';
 import { getPhaseAwareHabits } from '../services/phaseHabitsApi';
-import { DailyProgressAPI, HabitProgress as APIHabitProgress, MoodEntry as APIMoodEntry } from '../services/dailyProgressApi';
+import { DailyProgressAPI, HabitProgress as APIHabitProgress, MoodEntry as APIMoodEntry, DailyHabitsHistoryEntry } from '../services/dailyProgressApi';
 import { apiService } from '../services/apiService';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -289,6 +289,8 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
     // Empty for new user - will populate as they track daily habits
   ]);
   const [showHistory, setShowHistory] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   // Phase tracking state
   const [cyclePhase, setCyclePhase] = useState<CyclePhaseInfo | null>(null);
@@ -337,16 +339,66 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
     }
   };
 
-  // Load current streak on component mount
+  const loadDailyHabitsHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      
+      console.log('🔄 Loading daily habits history...');
+      const userId = user?.id || 'demo-user-123';
+      
+      const response = await DailyProgressAPI.getDailyHabitsHistory(userId, 30);
+      
+      if (response.success && response.entries) {
+        // Convert API response to local DailyEntry format
+        const convertedEntries: DailyEntry[] = response.entries.map((entry: DailyHabitsHistoryEntry) => ({
+          id: entry.id,
+          date: entry.date,
+          habits: entry.habits.map(habit => ({
+            habit: habit.habit_name,
+            completed: habit.completed
+          })),
+          mood: entry.mood ? {
+            mood: entry.mood.mood,
+            symptoms: entry.mood.symptoms,
+            notes: entry.mood.notes,
+            date: entry.mood.date
+          } : null,
+          completedCount: entry.completed_habits,
+          totalHabits: entry.total_habits,
+          progressPercentage: entry.completion_percentage
+        }));
+        
+        // Sort by date (newest first) - API already returns in desc order, but ensure it
+        convertedEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        setDailyEntries(convertedEntries);
+        console.log('✅ Daily habits history loaded:', convertedEntries.length, 'entries');
+      } else {
+        console.log('⚠️ No history data available');
+        setDailyEntries([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading daily habits history:', error);
+      setHistoryError('Failed to load previous entries');
+      showToast('Failed to load previous entries', 'error');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Load current streak and history on component mount
   useEffect(() => {
     loadCurrentStreak();
+    loadDailyHabitsHistory();
   }, []);
 
   // Refresh data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      console.log('🎯 DailyHabitsScreen: Screen focused, refreshing streak...');
+      console.log('🎯 DailyHabitsScreen: Screen focused, refreshing data...');
       loadCurrentStreak();
+      loadDailyHabitsHistory();
     }, [])
   );
 
@@ -857,63 +909,90 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
         {/* History Section */}
         {showHistory && (
           <View style={styles.historyCard}>
-            <Text style={styles.historyTitle}>Previous Entries</Text>
-            {dailyEntries.map((entry) => (
-              <View key={entry.id} style={styles.historyEntry}>
-                <View style={styles.historyHeader}>
-                  <Text style={styles.historyDate}>{formatDate(entry.date)}</Text>
-                  <Text style={styles.historyProgress}>
-                    {entry.completedCount}/{entry.totalHabits} habits
-                  </Text>
-                </View>
-                
-                <View style={styles.historyProgressBar}>
-                  <View 
-                    style={[
-                      styles.historyProgressFill, 
-                      { width: `${entry.progressPercentage}%` }
-                    ]} 
-                  />
-                </View>
-
-                {/* Mood Summary */}
-                {entry.mood && (
-                  <View style={styles.historyMood}>
-                    <Text style={styles.historyMoodEmoji}>
-                      {getMoodEmoji(entry.mood.mood)}
-                    </Text>
-                    <Text style={styles.historyMoodLabel}>
-                      {getMoodLabel(entry.mood.mood)}
-                    </Text>
-                    {entry.mood.symptoms.length > 0 && (
-                      <Text style={styles.historySymptoms}>
-                        {entry.mood.symptoms.slice(0, 3).join(', ')}
-                        {entry.mood.symptoms.length > 3 && ` +${entry.mood.symptoms.length - 3}`}
-                      </Text>
-                    )}
-                  </View>
-                )}
-
-                {/* Habits Summary */}
-                <View style={styles.historyHabits}>
-                  {entry.habits.map((habit, index) => (
-                    <View key={index} style={styles.historyHabitItem}>
-                      <Ionicons 
-                        name={habit.completed ? "checkmark-circle" : "close-circle"} 
-                        size={16} 
-                        color={habit.completed ? colors.success : colors.error} 
-                      />
-                      <Text style={[
-                        styles.historyHabitText,
-                        !habit.completed && styles.historyHabitTextIncomplete
-                      ]}>
-                        {habit.habit}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
+            <View style={styles.historyHeader}>
+              <Text style={styles.historyTitle}>Previous Entries</Text>
+              {isLoadingHistory && (
+                <Ionicons name="sync" size={16} color={colors.primary} />
+              )}
+            </View>
+            
+            {isLoadingHistory ? (
+              <View style={styles.historyLoading}>
+                <Text style={styles.historyLoadingText}>Loading previous entries...</Text>
               </View>
-            ))}
+            ) : historyError ? (
+              <View style={styles.historyError}>
+                <Text style={styles.historyErrorText}>{historyError}</Text>
+                <TouchableOpacity 
+                  style={styles.historyRetryButton}
+                  onPress={loadDailyHabitsHistory}
+                >
+                  <Text style={styles.historyRetryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : dailyEntries.length === 0 ? (
+              <View style={styles.historyEmpty}>
+                <Text style={styles.historyEmptyText}>No previous entries found</Text>
+                <Text style={styles.historyEmptySubtext}>Start tracking your habits to see your progress here</Text>
+              </View>
+            ) : (
+              dailyEntries.map((entry) => (
+                <View key={entry.id} style={styles.historyEntry}>
+                  <View style={styles.historyEntryHeader}>
+                    <Text style={styles.historyDate}>{formatDate(entry.date)}</Text>
+                    <Text style={styles.historyProgress}>
+                      {entry.completedCount}/{entry.totalHabits} habits
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.historyProgressBar}>
+                    <View 
+                      style={[
+                        styles.historyProgressFill, 
+                        { width: `${entry.progressPercentage}%` }
+                      ]} 
+                    />
+                  </View>
+
+                  {/* Mood Summary */}
+                  {entry.mood && (
+                    <View style={styles.historyMood}>
+                      <Text style={styles.historyMoodEmoji}>
+                        {getMoodEmoji(entry.mood.mood)}
+                      </Text>
+                      <Text style={styles.historyMoodLabel}>
+                        {getMoodLabel(entry.mood.mood)}
+                      </Text>
+                      {entry.mood.symptoms.length > 0 && (
+                        <Text style={styles.historySymptoms}>
+                          {entry.mood.symptoms.slice(0, 3).join(', ')}
+                          {entry.mood.symptoms.length > 3 && ` +${entry.mood.symptoms.length - 3}`}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Habits Summary */}
+                  <View style={styles.historyHabits}>
+                    {entry.habits.map((habit, index) => (
+                      <View key={index} style={styles.historyHabitItem}>
+                        <Ionicons 
+                          name={habit.completed ? "checkmark-circle" : "close-circle"} 
+                          size={16} 
+                          color={habit.completed ? colors.success : colors.error} 
+                        />
+                        <Text style={[
+                          styles.historyHabitText,
+                          !habit.completed && styles.historyHabitTextIncomplete
+                        ]}>
+                          {habit.habit}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))
+            )}
           </View>
         )}
       </ScrollView>
@@ -1314,6 +1393,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
+  },
+  historyEntryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   historyDate: {
@@ -1376,6 +1461,50 @@ const styles = StyleSheet.create({
   historyHabitTextIncomplete: {
     color: colors.textSecondary,
     textDecorationLine: 'line-through',
+  },
+  historyLoading: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  historyLoadingText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  historyError: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  historyErrorText: {
+    fontSize: 14,
+    color: colors.error,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  historyRetryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  historyRetryButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  historyEmpty: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  historyEmptyText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  historyEmptySubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   // Phase tracking styles
   phaseInfoCard: {

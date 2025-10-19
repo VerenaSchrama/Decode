@@ -55,7 +55,7 @@ class InterventionMatcher:
             for intervention_data in self.interventions_data:
                 intervention = intervention_data['intervention']
                 # Use Clinical Background for matching
-                profile_text = f"{intervention['Strategy Name']}: {intervention['Clinical Background']}"
+                profile_text = f"{intervention['strategy_name']}: {intervention['clinical_background']}"
                 embedding = self.embeddings.embed_query(profile_text)
                 embeddings.append(embedding)
             
@@ -99,20 +99,20 @@ class InterventionMatcher:
             best_habits = best_intervention_data['habits']
             
             # Format habits for response
-            habit_descriptions = [habit['Habit Name'] for habit in best_habits]
+            habit_descriptions = [habit['habit_name'] for habit in best_habits]
             
             return {
                 "intervention_id": best_intervention['Intervention_ID'],
-                "intervention_name": best_intervention['Strategy Name'],
-                "intervention_profile": best_intervention['Clinical Background'],
-                "scientific_source": best_intervention['Show Sources'],
+                "intervention_name": best_intervention['strategy_name'],
+                "intervention_profile": best_intervention['clinical_background'],
+                "scientific_source": best_intervention['show_sources'],
                 "similarity_score": float(best_similarity),
                 "habits": habit_descriptions,
-                "category_strategy": best_intervention.get('Category Strategy', ''),
-                "symptoms_match": best_intervention.get('Symtpoms match', ''),
-                "persona_fit": best_intervention.get('Persona fit (prior)', ''),
-                "dietary_fit": best_intervention.get('Dietary fit (prior)', ''),
-                "movement_amount": best_intervention.get('Amount of movemen...', '')
+                "category_strategy": best_intervention.get('category_strategy', ''),
+                "symptoms_match": best_intervention.get('symptoms_match', ''),
+                "persona_fit": best_intervention.get('persona_fit_prior', ''),
+                "dietary_fit": best_intervention.get('dietary_fit_prior', ''),
+                "movement_amount": best_intervention.get('amount_of_movement_prior', '')
             }
             
         except Exception as e:
@@ -149,21 +149,21 @@ class InterventionMatcher:
                     intervention_data = self.interventions_data[idx]
                     intervention = intervention_data['intervention']
                     habits = intervention_data['habits']
-                    habit_descriptions = [habit['Habit Name'] for habit in habits]
+                    habit_descriptions = [habit['habit_name'] for habit in habits]
                     
                     recommendations.append({
                         "intervention_id": intervention['Intervention_ID'],
-                        "intervention_name": intervention['Strategy Name'],
-                        "intervention_profile": intervention['Clinical Background'],
-                        "what_will_you_be_doing": intervention.get('What will you be doing?', ''),
-                        "scientific_source": intervention['Show Sources'],
+                        "intervention_name": intervention['strategy_name'],
+                        "intervention_profile": intervention['clinical_background'],
+                        "what_will_you_be_doing": intervention.get('what_will_you_be_doing', ''),
+                        "scientific_source": intervention['show_sources'],
                         "similarity_score": float(similarity),
                         "habits": habit_descriptions,
-                        "category_strategy": intervention.get('Category Strategy', ''),
-                        "symptoms_match": intervention.get('Symtpoms match', ''),
-                        "persona_fit": intervention.get('Persona fit (prior)', ''),
-                        "dietary_fit": intervention.get('Dietary fit (prior)', ''),
-                        "movement_amount": intervention.get('Amount of movemen...', '')
+                        "category_strategy": intervention.get('category_strategy', ''),
+                        "symptoms_match": intervention.get('symptoms_match', ''),
+                        "persona_fit": intervention.get('persona_fit_prior', ''),
+                        "dietary_fit": intervention.get('dietary_fit_prior', ''),
+                        "movement_amount": intervention.get('amount_of_movement_prior', '')
                     })
             
             return {
@@ -188,19 +188,19 @@ class InterventionMatcher:
             
             intervention = result['intervention']
             habits = result['habits']
-            habit_descriptions = [habit['Habit Name'] for habit in habits]
+            habit_descriptions = [habit['habit_name'] for habit in habits]
             
             return {
                 "intervention_id": intervention['Intervention_ID'],
-                "intervention_name": intervention['Strategy Name'],
-                "intervention_profile": intervention['Clinical Background'],
-                "scientific_source": intervention['Show Sources'],
+                "intervention_name": intervention['strategy_name'],
+                "intervention_profile": intervention['clinical_background'],
+                "scientific_source": intervention['show_sources'],
                 "habits": habit_descriptions,
-                "category_strategy": intervention.get('Category Strategy', ''),
-                "symptoms_match": intervention.get('Symtpoms match', ''),
-                "persona_fit": intervention.get('Persona fit (prior)', ''),
-                "dietary_fit": intervention.get('Dietary fit (prior)', ''),
-                "movement_amount": intervention.get('Amount of movemen...', '')
+                "category_strategy": intervention.get('category_strategy', ''),
+                "symptoms_match": intervention.get('symptoms_match', ''),
+                "persona_fit": intervention.get('persona_fit_prior', ''),
+                "dietary_fit": intervention.get('dietary_fit_prior', ''),
+                "movement_amount": intervention.get('amount_of_movement_prior', '')
             }
             
         except Exception as e:

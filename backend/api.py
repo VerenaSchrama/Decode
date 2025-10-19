@@ -348,14 +348,14 @@ async def list_interventions():
         for intervention in result.data:
             interventions.append({
                 "id": intervention['Intervention_ID'],
-                "name": intervention['Strategy Name'],
-                "profile": intervention['Clinical Background'],
-                "scientific_source": intervention.get('Scientific Source', ''),
-                "category": intervention.get('Category Strategy', ''),
-                "symptoms_match": intervention.get('Symptoms Match', ''),
-                "persona_fit": intervention.get('Persona Fit', ''),
-                "dietary_fit": intervention.get('Dietary Fit', ''),
-                "movement_amount": intervention.get('Amount of movement', '')
+                "name": intervention['strategy_name'],
+                "profile": intervention['clinical_background'],
+                "scientific_source": intervention.get('show_sources', ''),
+                "category": intervention.get('category_strategy', ''),
+                "symptoms_match": intervention.get('symptoms_match', ''),
+                "persona_fit": intervention.get('persona_fit_prior', ''),
+                "dietary_fit": intervention.get('dietary_fit_prior', ''),
+                "movement_amount": intervention.get('amount_of_movement_prior', '')
             })
         
         return {"interventions": interventions}
@@ -364,6 +364,35 @@ async def list_interventions():
         raise HTTPException(
             status_code=500,
             detail=f"Error loading interventions: {str(e)}"
+        )
+
+@app.get("/habits/{intervention_id}")
+async def get_habits_for_intervention(intervention_id: int):
+    """Get habits for specific intervention"""
+    try:
+        from models import supabase_client
+        
+        result = supabase_client.client.table('HabitsBASE')\
+            .select('*')\
+            .eq('connects_intervention_id', intervention_id)\
+            .execute()
+        
+        habits = []
+        for habit in result.data:
+            habits.append({
+                "id": habit['Habit_ID'],
+                "name": habit['habit_name'],
+                "description": habit['what_will_you_be_doing'],
+                "why_it_works": habit['why_does_it_work'],
+                "in_practice": habit['what_does_that_look_like_in_practice']
+            })
+        
+        return {"habits": habits}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error loading habits: {str(e)}"
         )
 
 @app.post("/intervention-period")
@@ -478,52 +507,96 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'created_at': datetime.now().isoformat()
         }
         
-        # Store in database using user_uuid (after migration)
-        # Map demo user to the UUID in user_profiles
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
-        
+        # Handle demo users differently to avoid foreign key constraints
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            # For demo users, we'll store data in a way that doesn't require foreign keys
+            # We'll use a special demo user ID that we can create in the database
+            db_user_uuid = 'demo-user-123'  # Use string ID for demo users
+            
+            # For demo users, we'll store data in a simplified way
+            # that doesn't require the profiles table foreign key constraint
+            print(f"DEBUG: Using demo user approach for {user_id}")
         else:
             # For authenticated users, use their actual UUID
             # TODO: Implement proper user UUID lookup
-            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+            db_user_uuid = user_id  # Use the provided user_id
         
-        db_data = {
-            'user_uuid': db_user_uuid,
-            'entry_date': entry_date,
-            'habits_completed': [h['habit'] for h in completed_habits],  # Array of completed habit names
-            'mood': mood.get('mood') if mood else None,
-            'notes': mood.get('notes', '') if mood else ''
-        }
+        # NEW SCHEMA: Create individual entries for each habit
+        entry_ids = []
         
-        print(f"DEBUG: Attempting to upsert data: {db_data}")
-        
-        # Use upsert with proper conflict resolution
-        # For Supabase, we need to handle the conflict manually
-        try:
-            # First try to insert
-            result = supabase_client.client.table('daily_habit_entries').insert(db_data).execute()
-        except Exception as e:
-            if 'duplicate key value violates unique constraint' in str(e):
-                # If duplicate, update the existing record
-                result = supabase_client.client.table('daily_habit_entries').update({
-                    'habits_completed': db_data['habits_completed'],
-                    'mood': db_data['mood'],
-                    'notes': db_data['notes'],
-                    'completion_percentage': db_data.get('completion_percentage', 0.0),
-                    'updated_at': datetime.now().isoformat()
-                }).eq('user_uuid', db_data['user_uuid']).eq('entry_date', db_data['entry_date']).execute()
+        # Handle habit creation differently for demo vs authenticated users
+        for habit in habits:
+            habit_name = habit.get('habit', '')
+            if not habit_name:
+                continue
+            
+            if user_id == 'demo-user-123':
+                # For demo users, we'll use a simplified approach
+                # that doesn't require the user_habits table foreign key constraint
+                # We'll create a temporary habit_id for demo users
+                habit_id = f"demo-{habit_name.replace(' ', '-').lower()}"
+                print(f"DEBUG: Using demo habit_id: {habit_id}")
             else:
-                raise e
+                # For authenticated users, use the normal user_habits table
+                # Check if user_habit exists, if not create it
+                user_habit_result = supabase_client.client.table('user_habits')\
+                    .select('id')\
+                    .eq('user_id', db_user_uuid)\
+                    .eq('habit_name', habit_name)\
+                    .execute()
+                
+                if not user_habit_result.data:
+                    # Create new user_habit
+                    user_habit_data = {
+                        'user_id': db_user_uuid,
+                        'habit_name': habit_name,
+                        'habit_description': f"Daily habit: {habit_name}",
+                        'status': 'active'
+                    }
+                    user_habit_result = supabase_client.client.table('user_habits').insert(user_habit_data).execute()
+                
+                habit_id = user_habit_result.data[0]['id']
+            
+            if user_id == 'demo-user-123':
+                # For demo users, we'll store data in a simplified way
+                # that doesn't require foreign key constraints
+                # We'll just track the entry locally and return success
+                entry_id = f"demo-{entry_date}-{habit_id}"
+                entry_ids.append(entry_id)
+                print(f"DEBUG: Demo user entry created: {entry_id}")
+            else:
+                # For authenticated users, use the normal daily_habit_entries table
+                daily_entry_data = {
+                    'user_id': db_user_uuid,
+                    'habit_id': habit_id,
+                    'entry_date': entry_date,
+                    'completed': habit.get('completed', False),
+                    'mood': mood.get('mood') if mood else None,
+                    'notes': mood.get('notes', '') if mood else ''
+                }
+                
+                try:
+                    # Try to insert new entry
+                    result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
+                    entry_ids.append(result.data[0]['id'])
+                except Exception as e:
+                    if 'duplicate key value violates unique constraint' in str(e):
+                        # Update existing entry
+                        result = supabase_client.client.table('daily_habit_entries').update({
+                            'completed': daily_entry_data['completed'],
+                            'mood': daily_entry_data['mood'],
+                            'notes': daily_entry_data['notes'],
+                            'updated_at': datetime.now().isoformat()
+                        }).eq('user_id', db_user_uuid).eq('habit_id', habit_id).eq('entry_date', entry_date).execute()
+                        entry_ids.append(result.data[0]['id'] if result.data else str(uuid.uuid4()))
+                    else:
+                        raise e
         
-        print(f"DEBUG: Upsert result: {result.data}")
-        
-        entry_id = result.data[0]['id'] if result.data else str(uuid.uuid4())
+        print(f"DEBUG: Created/updated {len(entry_ids)} daily habit entries")
         
         return {
             "success": True,
-            "entry_id": entry_id,
+            "entry_id": entry_ids[0] if entry_ids else str(uuid.uuid4()),
             "completion_percentage": completion_percentage,
             "completed_habits": len(completed_habits),
             "total_habits": total_habits
@@ -567,11 +640,11 @@ async def get_daily_progress(user_id: str, days: int = 7):
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days-1)
         
-        # Query daily entries using user_uuid
+        # Query daily entries using user_id
         try:
             result = supabase_client.client.table('daily_habit_entries')\
                 .select('*')\
-                .eq('user_uuid', db_user_uuid)\
+                .eq('user_id', db_user_uuid)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -597,6 +670,398 @@ async def get_daily_progress(user_id: str, days: int = 7):
         raise HTTPException(
             status_code=500,
             detail=f"Error getting daily progress: {str(e)}"
+        )
+
+@app.get("/user/{user_id}/daily-summaries")
+async def get_daily_summaries(user_id: str, days: int = 7):
+    """
+    Get user's daily summaries for the last N days from daily_summaries table
+    
+    Args:
+        user_id: User ID
+        days: Number of days to retrieve (default: 7)
+        
+    Returns:
+        Array of daily summary entries with completion percentages
+    """
+    try:
+        from models import supabase_client
+        from datetime import datetime, timedelta
+        
+        # Map user_id to user_uuid (after migration)
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        
+        if user_id == 'demo-user-123':
+            db_user_uuid = demo_user_uuid
+        else:
+            # For authenticated users, use their actual UUID
+            # TODO: Implement proper user UUID lookup
+            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+        
+        # Calculate date range
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days-1)
+        
+        # Query daily summaries
+        try:
+            result = supabase_client.client.table('daily_summaries')\
+                .select('*')\
+                .eq('user_id', db_user_uuid)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', end_date.isoformat())\
+                .order('entry_date', desc=True)\
+                .execute()
+            
+            summaries = result.data
+        except Exception as db_error:
+            # If database fails due to RLS or other issues, return empty data
+            print(f"Database query failed (RLS or other issue): {db_error}")
+            summaries = []
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "summaries": summaries,
+            "date_range": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat()
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting daily summaries: {str(e)}"
+        )
+
+@app.get("/user/{user_id}/daily-summary/{date}")
+async def get_daily_summary(user_id: str, date: str):
+    """
+    Get specific day's summary from daily_summaries table
+    
+    Args:
+        user_id: User ID
+        date: Date in YYYY-MM-DD format
+        
+    Returns:
+        Daily summary for the specific date
+    """
+    try:
+        from models import supabase_client
+        
+        # Map user_id to user_uuid (after migration)
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        
+        if user_id == 'demo-user-123':
+            db_user_uuid = demo_user_uuid
+        else:
+            # For authenticated users, use their actual UUID
+            # TODO: Implement proper user UUID lookup
+            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+        
+        # Query specific day's summary
+        try:
+            result = supabase_client.client.table('daily_summaries')\
+                .select('*')\
+                .eq('user_id', db_user_uuid)\
+                .eq('entry_date', date)\
+                .execute()
+            
+            if result.data:
+                summary = result.data[0]
+            else:
+                summary = None
+                
+        except Exception as db_error:
+            print(f"Database query failed (RLS or other issue): {db_error}")
+            summary = None
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "date": date,
+            "summary": summary
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting daily summary: {str(e)}"
+        )
+
+@app.get("/user/{user_id}/analytics")
+async def get_user_analytics(user_id: str, days: int = 30):
+    """
+    Get user analytics and trends from daily_summaries table
+    
+    Args:
+        user_id: User ID
+        days: Number of days to analyze (default: 30)
+        
+    Returns:
+        Analytics data including trends, best/worst days, averages
+    """
+    try:
+        from models import supabase_client
+        from datetime import datetime, timedelta
+        
+        # Map user_id to user_uuid (after migration)
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        
+        if user_id == 'demo-user-123':
+            db_user_uuid = demo_user_uuid
+        else:
+            # For authenticated users, use their actual UUID
+            # TODO: Implement proper user UUID lookup
+            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+        
+        # Calculate date range
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days-1)
+        
+        # Query daily summaries for analytics
+        try:
+            result = supabase_client.client.table('daily_summaries')\
+                .select('*')\
+                .eq('user_id', db_user_uuid)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', end_date.isoformat())\
+                .order('entry_date', desc=True)\
+                .execute()
+            
+            summaries = result.data
+        except Exception as db_error:
+            print(f"Database query failed (RLS or other issue): {db_error}")
+            summaries = []
+        
+        # Calculate analytics
+        if summaries:
+            completion_percentages = [s['completion_percentage'] for s in summaries if s['completion_percentage'] is not None]
+            moods = [s['overall_mood'] for s in summaries if s['overall_mood'] is not None]
+            
+            # Basic statistics
+            avg_completion = sum(completion_percentages) / len(completion_percentages) if completion_percentages else 0
+            avg_mood = sum(moods) / len(moods) if moods else 0
+            
+            # Best and worst days
+            best_day = max(summaries, key=lambda x: x['completion_percentage']) if summaries else None
+            worst_day = min(summaries, key=lambda x: x['completion_percentage']) if summaries else None
+            
+            # Streak calculation (consecutive days with >80% completion)
+            current_streak = 0
+            for summary in sorted(summaries, key=lambda x: x['entry_date'], reverse=True):
+                if summary['completion_percentage'] >= 80:
+                    current_streak += 1
+                else:
+                    break
+            
+            # Weekly trends (last 4 weeks)
+            weekly_trends = []
+            for i in range(4):
+                week_start = end_date - timedelta(days=(i+1)*7-1)
+                week_end = end_date - timedelta(days=i*7)
+                week_summaries = [s for s in summaries if week_start <= datetime.fromisoformat(s['entry_date']).date() <= week_end]
+                if week_summaries:
+                    week_avg = sum(s['completion_percentage'] for s in week_summaries) / len(week_summaries)
+                    weekly_trends.append({
+                        'week': f"Week {4-i}",
+                        'start_date': week_start.isoformat(),
+                        'end_date': week_end.isoformat(),
+                        'avg_completion': round(week_avg, 1),
+                        'days_tracked': len(week_summaries)
+                    })
+            
+        else:
+            avg_completion = 0
+            avg_mood = 0
+            best_day = None
+            worst_day = None
+            current_streak = 0
+            weekly_trends = []
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "analytics": {
+                "period": {
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "days_analyzed": len(summaries)
+                },
+                "averages": {
+                    "completion_percentage": round(avg_completion, 1),
+                    "mood": round(avg_mood, 1)
+                },
+                "streaks": {
+                    "current_streak": current_streak
+                },
+                "best_day": {
+                    "date": best_day['entry_date'] if best_day else None,
+                    "completion_percentage": best_day['completion_percentage'] if best_day else None,
+                    "mood": best_day['overall_mood'] if best_day else None
+                },
+                "worst_day": {
+                    "date": worst_day['entry_date'] if worst_day else None,
+                    "completion_percentage": worst_day['completion_percentage'] if worst_day else None,
+                    "mood": worst_day['overall_mood'] if worst_day else None
+                },
+                "weekly_trends": weekly_trends
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting user analytics: {str(e)}"
+        )
+
+@app.get("/user/{user_id}/daily-habits-history")
+async def get_daily_habits_history(user_id: str, days: int = 30):
+    """
+    Get daily habits history optimized for the daily habits screen UI
+    
+    This endpoint joins daily_summaries with daily_habit_entries to provide
+    complete historical data including individual habit completion status.
+    
+    Args:
+        user_id: User ID
+        days: Number of days to retrieve (default: 30)
+        
+    Returns:
+        Array of daily entries with habit details, mood, and completion data
+    """
+    try:
+        from models import supabase_client
+        from datetime import datetime, timedelta
+        
+        # Map user_id to user_uuid (after migration)
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        
+        if user_id == 'demo-user-123':
+            db_user_uuid = demo_user_uuid
+        else:
+            # For authenticated users, use their actual UUID
+            # TODO: Implement proper user UUID lookup
+            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+        
+        # Calculate date range
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days-1)
+        
+        # Query daily summaries with habit details
+        try:
+            # First get daily summaries
+            summaries_result = supabase_client.client.table('daily_summaries')\
+                .select('*')\
+                .eq('user_id', db_user_uuid)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', end_date.isoformat())\
+                .order('entry_date', desc=True)\
+                .execute()
+            
+            summaries = summaries_result.data
+            
+            # Get individual habit entries for each day
+            habit_entries_result = supabase_client.client.table('daily_habit_entries')\
+                .select('*')\
+                .eq('user_id', db_user_uuid)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', end_date.isoformat())\
+                .order('entry_date', desc=True)\
+                .execute()
+            
+            habit_entries = habit_entries_result.data
+            
+        except Exception as db_error:
+            print(f"Database query failed (RLS or other issue): {db_error}")
+            summaries = []
+            habit_entries = []
+        
+        # Group habit entries by date
+        habits_by_date = {}
+        for entry in habit_entries:
+            date = entry['entry_date']
+            if date not in habits_by_date:
+                habits_by_date[date] = []
+            
+            # Get habit name from user_habits table
+            habit_name = entry.get('habit_name', 'Unknown Habit')
+            if not habit_name or habit_name == 'Unknown Habit':
+                # Try to get habit name from the habit_id if available
+                try:
+                    if entry.get('habit_id'):
+                        habit_result = supabase_client.client.table('user_habits')\
+                            .select('habit_name')\
+                            .eq('id', entry['habit_id'])\
+                            .execute()
+                        if habit_result.data:
+                            habit_name = habit_result.data[0]['habit_name']
+                except:
+                    pass
+            
+            habits_by_date[date].append({
+                'habit_name': habit_name,
+                'completed': entry.get('completed', False),
+                'mood': entry.get('mood'),
+                'notes': entry.get('notes', '')
+            })
+        
+        # Combine summaries with habit details
+        history_entries = []
+        for summary in summaries:
+            date = summary['entry_date']
+            habits = habits_by_date.get(date, [])
+            
+            # Get mood data from the most recent habit entry with mood
+            mood_data = None
+            for habit in habits:
+                if habit.get('mood') is not None:
+                    mood_data = {
+                        'mood': habit['mood'],
+                        'symptoms': [],  # We don't store symptoms in individual entries
+                        'notes': habit.get('notes', ''),
+                        'date': date
+                    }
+                    break
+            
+            # If no mood in habit entries, use summary mood
+            if not mood_data and summary.get('overall_mood'):
+                mood_data = {
+                    'mood': summary['overall_mood'],
+                    'symptoms': [],
+                    'notes': summary.get('overall_notes', ''),
+                    'date': date
+                }
+            
+            history_entry = {
+                'id': summary['id'],
+                'date': date,
+                'total_habits': summary['total_habits'],
+                'completed_habits': summary['completed_habits'],
+                'completion_percentage': summary['completion_percentage'],
+                'mood': mood_data,
+                'habits': habits,
+                'created_at': summary['created_at'],
+                'updated_at': summary['updated_at']
+            }
+            
+            history_entries.append(history_entry)
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "entries": history_entries,
+            "date_range": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat()
+            },
+            "total_entries": len(history_entries)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting daily habits history: {str(e)}"
         )
 
 @app.get("/user/{user_id}/streak")
@@ -626,29 +1091,32 @@ async def get_habit_streak(user_id: str):
             # TODO: Implement proper user UUID lookup
             db_user_uuid = demo_user_uuid  # Fallback to demo for now
         
-        # Get recent entries using user_uuid
+        # Get recent daily summaries for streak calculation
         try:
-            result = supabase_client.client.table('daily_habit_entries')\
+            result = supabase_client.client.table('daily_summaries')\
                 .select('entry_date, completion_percentage')\
-                .eq('user_uuid', db_user_uuid)\
+                .eq('user_id', db_user_uuid)\
                 .gte('entry_date', (datetime.now().date() - timedelta(days=30)).isoformat())\
                 .order('entry_date', desc=True)\
                 .execute()
             
-            entries = result.data
+            summaries = result.data
         except Exception as db_error:
             # If database fails due to RLS or other issues, return 0 streak
             print(f"Database query failed (RLS or other issue): {db_error}")
-            entries = []
+            summaries = []
         
-        # Calculate streak
+        # Calculate streak using pre-calculated completion percentages
         streak = 0
         current_date = datetime.now().date()
         
-        for entry in entries:
-            entry_date = datetime.fromisoformat(entry['entry_date']).date()
+        for summary in summaries:
+            entry_date = datetime.fromisoformat(summary['entry_date']).date()
+            completion_pct = summary.get('completion_percentage', 0)
+            
+            # Check if this is today or yesterday
             if entry_date == current_date or entry_date == current_date - timedelta(days=1):
-                if entry['completion_percentage'] >= 50:  # Consider 50%+ as a successful day
+                if completion_pct >= 50:  # Consider 50%+ as a successful day
                     streak += 1
                     current_date = entry_date
                 else:

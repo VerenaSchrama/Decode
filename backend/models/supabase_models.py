@@ -17,12 +17,19 @@ class SupabaseClient:
     
     def __init__(self):
         self.url = os.getenv("SUPABASE_URL")
-        self.key = os.getenv("SUPABASE_ANON_KEY")
+        # Use service role key for backend operations to bypass RLS
+        self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
         
         if not self.url or not self.key:
             raise ValueError("Missing Supabase credentials in environment variables")
         
         self.client: Client = create_client(self.url, self.key)
+        
+        # Log which key is being used
+        if os.getenv("SUPABASE_SERVICE_ROLE_KEY"):
+            print("✅ Using service role key for Supabase client")
+        else:
+            print("⚠️ Using anon key for Supabase client (RLS may block operations)")
     
     # User operations
     def create_user(self, user_data: Dict[str, Any]):
@@ -70,13 +77,48 @@ class SupabaseClient:
         return self.client.table('HabitsBASE').select('*').execute()
     
     def get_habits_by_intervention_base(self, intervention_id: int):
-        """Get all habits for a specific intervention from HabitsBASE"""
-        return self.client.table('HabitsBASE').select('*').eq('Connects Intervention_ID', intervention_id).execute()
+        """Get habits for specific intervention from HabitsBASE"""
+        return self.client.table('HabitsBASE').select('*').eq('connects_intervention_id', intervention_id).execute()
+    
+    def get_daily_habit_entries(self, user_id: str, start_date: str, end_date: str):
+        """Get daily habit entries for user"""
+        return self.client.table('daily_habit_entries')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .gte('entry_date', start_date)\
+            .lte('entry_date', end_date)\
+            .execute()
+    
+    def get_user_intervention_periods(self, user_id: str):
+        """Get user's intervention periods"""
+        return self.client.table('intervention_periods')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .execute()
+    
+    def create_intervention_period(self, period_data: Dict[str, Any]):
+        """Create intervention period"""
+        return self.client.table('intervention_periods').insert(period_data).execute()
+    
+    def get_user_habits(self, user_id: str):
+        """Get user's habits"""
+        return self.client.table('user_habits')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .execute()
+    
+    def get_user_interventions(self, user_id: str):
+        """Get user's interventions"""
+        return self.client.table('user_interventions')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .execute()
+    
     
     def get_habits_by_intervention_name(self, strategy_name: str):
         """Get habits for an intervention by strategy name"""
         # First get the intervention ID
-        intervention = self.client.table('InterventionsBASE').select('Intervention_ID').eq('Strategy Name', strategy_name).execute()
+        intervention = self.client.table('InterventionsBASE').select('Intervention_ID').eq('strategy_name', strategy_name).execute()
         
         if not intervention.data:
             return []
@@ -175,7 +217,7 @@ class SupabaseClient:
     
     def get_user_recommendations(self, user_id: str):
         """Get all recommendations for a user"""
-        return self.client.table('intakes').select('*').eq('user_id', user_id).execute()
+        return self.client.table('intakes').select('*').eq('user_uuid', user_id).execute()
     
     # Custom intervention operations (unchanged)
     def create_custom_intervention(self, intervention_data: Dict[str, Any]):

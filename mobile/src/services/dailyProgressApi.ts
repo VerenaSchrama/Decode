@@ -108,4 +108,44 @@ export class DailyProgressAPI {
       throw error;
     }
   }
+
+  static async getDailyHabitsHistory(
+    userId: string,
+    days: number = 30
+  ): Promise<{ success: boolean; entries: DailyHabitsHistoryEntry[]; total_entries: number }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/user/${userId}/daily-habits-history?days=${days}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting daily habits history:', error);
+      throw error;
+    }
+  }
+}
+
+export interface DailyHabitsHistoryEntry {
+  id: string;
+  date: string;
+  total_habits: number;
+  completed_habits: number;
+  completion_percentage: number;
+  mood: {
+    mood: number;
+    symptoms: string[];
+    notes: string;
+    date: string;
+  } | null;
+  habits: Array<{
+    habit_name: string;
+    completed: boolean;
+    mood?: number;
+    notes?: string;
+  }>;
+  created_at: string;
+  updated_at: string;
 }

@@ -11,8 +11,8 @@ def get_intervention_names():
     """Get valid intervention names from database"""
     try:
         from .supabase_models import supabase_client
-        result = supabase_client.client.table('InterventionsBASE').select('Strategy Name').execute()
-        return [intervention['Strategy Name'] for intervention in result.data]
+        result = supabase_client.client.table('InterventionsBASE').select('strategy_name').execute()
+        return [intervention['strategy_name'] for intervention in result.data]
     except:
         return []
 
@@ -20,8 +20,8 @@ def get_habit_options():
     """Get all possible habit options from database"""
     try:
         from .supabase_models import supabase_client
-        result = supabase_client.client.table('HabitsBASE').select('Habit Name').execute()
-        return [habit['Habit Name'] for habit in result.data]
+        result = supabase_client.client.table('HabitsBASE').select('habit_name').execute()
+        return [habit['habit_name'] for habit in result.data]
     except:
         return []
 
