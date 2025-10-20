@@ -399,6 +399,7 @@ async def get_habits_for_intervention(intervention_id: int):
 async def create_intervention_period(period_data: dict):
     """Store user's intervention period selection"""
     try:
+        from models import supabase_client
         # Store intervention period data
         result = supabase_client.create_intervention_period(period_data)
         return {"success": True, "period_id": result.data[0]['id']}
@@ -1703,6 +1704,135 @@ async def get_user_interventions(user_id: str):
     except Exception as e:
         print(f"Error getting user interventions: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get user interventions: {str(e)}")
+
+@app.get("/user/{user_id}/session-data")
+async def get_user_session_data(user_id: str):
+    """
+    Get complete user session data for app restoration
+    
+    This endpoint retrieves all necessary data to restore a user's session:
+    - Latest intake data
+    - Current intervention period
+    - Selected habits
+    - Daily progress history
+    
+    Args:
+        user_id: User ID
+        
+    Returns:
+        Complete session data for frontend restoration
+    """
+    try:
+        from models import supabase_client
+        from datetime import datetime, timedelta
+        
+        # Map user_id to user_uuid (after migration)
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        
+        if user_id == 'demo-user-123':
+            db_user_uuid = demo_user_uuid
+        else:
+            # For authenticated users, use their actual UUID
+            # TODO: Implement proper user UUID lookup
+            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+        
+        session_data = {
+            "user_id": user_id,
+            "intake_data": None,
+            "current_intervention": None,
+            "selected_habits": [],
+            "daily_progress": [],
+            "intervention_periods": []
+        }
+        
+        # 1. Get latest intake data
+        try:
+            intake_result = supabase_client.client.table('intakes')\
+                .select('*')\
+                .eq('user_id', db_user_uuid)\
+                .order('created_at', desc=True)\
+                .limit(1)\
+                .execute()
+            
+            if intake_result.data:
+                intake = intake_result.data[0]
+                session_data["intake_data"] = {
+                    "id": intake['id'],
+                    "profile": intake['intake_data'].get('profile', {}),
+                    "lastPeriod": intake['intake_data'].get('last_period', {}),
+                    "symptoms": intake['intake_data'].get('symptoms', {}),
+                    "interventions": intake['intake_data'].get('interventions', {}),
+                    "habits": intake['intake_data'].get('habits', {}),
+                    "dietaryPreferences": intake['intake_data'].get('dietary_preferences', {}),
+                    "created_at": intake['created_at']
+                }
+        except Exception as e:
+            print(f"Error getting intake data: {e}")
+        
+        # 2. Get current intervention period
+        try:
+            period_result = supabase_client.client.table('intervention_periods')\
+                .select('*')\
+                .eq('user_id', db_user_uuid)\
+                .eq('status', 'active')\
+                .order('start_date', desc=True)\
+                .limit(1)\
+                .execute()
+            
+            if period_result.data:
+                period = period_result.data[0]
+                session_data["current_intervention"] = {
+                    "id": period['intervention_id'],
+                    "name": period['intervention_name'],
+                    "start_date": period['start_date'],
+                    "planned_end_date": period['planned_end_date'],
+                    "cycle_phase_at_start": period['cycle_phase_at_start'],
+                    "completion_percentage": period['completion_percentage']
+                }
+                session_data["selected_habits"] = period.get('selected_habits', [])
+        except Exception as e:
+            print(f"Error getting intervention period: {e}")
+        
+        # 3. Get recent daily progress (last 7 days)
+        try:
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=7)
+            
+            progress_result = supabase_client.client.table('daily_habit_entries')\
+                .select('*')\
+                .eq('user_id', db_user_uuid)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', end_date.isoformat())\
+                .order('entry_date', desc=True)\
+                .execute()
+            
+            session_data["daily_progress"] = progress_result.data or []
+        except Exception as e:
+            print(f"Error getting daily progress: {e}")
+        
+        # 4. Get all intervention periods for history
+        try:
+            periods_result = supabase_client.client.table('intervention_periods')\
+                .select('*')\
+                .eq('user_id', db_user_uuid)\
+                .order('start_date', desc=True)\
+                .execute()
+            
+            session_data["intervention_periods"] = periods_result.data or []
+        except Exception as e:
+            print(f"Error getting intervention periods: {e}")
+        
+        return {
+            "success": True,
+            "session_data": session_data
+        }
+        
+    except Exception as e:
+        print(f"Error getting user session data: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting user session data: {str(e)}"
+        )
 
 @app.get("/interventions/approved", response_model=List[UserInterventionResponse])
 async def get_approved_interventions():
