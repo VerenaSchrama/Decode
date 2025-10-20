@@ -634,8 +634,8 @@ async def get_daily_progress(user_id: str, days: int = 7):
             db_user_uuid = demo_user_uuid
         else:
             # For authenticated users, use their actual UUID
-            # TODO: Implement proper user UUID lookup
-            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+            # Real users send their actual UUID as user_id
+            db_user_uuid = user_id
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -696,8 +696,8 @@ async def get_daily_summaries(user_id: str, days: int = 7):
             db_user_uuid = demo_user_uuid
         else:
             # For authenticated users, use their actual UUID
-            # TODO: Implement proper user UUID lookup
-            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+            # Real users send their actual UUID as user_id
+            db_user_uuid = user_id
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -757,8 +757,8 @@ async def get_daily_summary(user_id: str, date: str):
             db_user_uuid = demo_user_uuid
         else:
             # For authenticated users, use their actual UUID
-            # TODO: Implement proper user UUID lookup
-            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+            # Real users send their actual UUID as user_id
+            db_user_uuid = user_id
         
         # Query specific day's summary
         try:
@@ -813,8 +813,8 @@ async def get_user_analytics(user_id: str, days: int = 30):
             db_user_uuid = demo_user_uuid
         else:
             # For authenticated users, use their actual UUID
-            # TODO: Implement proper user UUID lookup
-            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+            # Real users send their actual UUID as user_id
+            db_user_uuid = user_id
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -942,8 +942,8 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             db_user_uuid = demo_user_uuid
         else:
             # For authenticated users, use their actual UUID
-            # TODO: Implement proper user UUID lookup
-            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+            # Real users send their actual UUID as user_id
+            db_user_uuid = user_id
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -1089,8 +1089,8 @@ async def get_habit_streak(user_id: str):
             db_user_uuid = demo_user_uuid
         else:
             # For authenticated users, use their actual UUID
-            # TODO: Implement proper user UUID lookup
-            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+            # Real users send their actual UUID as user_id
+            db_user_uuid = user_id
         
         # Get recent daily summaries for streak calculation
         try:
@@ -1733,8 +1733,8 @@ async def get_user_session_data(user_id: str):
             db_user_uuid = demo_user_uuid
         else:
             # For authenticated users, use their actual UUID
-            # TODO: Implement proper user UUID lookup
-            db_user_uuid = demo_user_uuid  # Fallback to demo for now
+            # Real users send their actual UUID as user_id
+            db_user_uuid = user_id
         
         session_data = {
             "user_id": user_id,

@@ -40,6 +40,15 @@ export interface ApiResponse<T = any> {
 }
 
 export interface ChatMessage {
+  id: string;
+  user_id: string;
+  message: string;
+  is_user: boolean;
+  timestamp: string;
+  context_used?: any;
+}
+
+export interface ChatRequest {
   user_id: string;
   message: string;
   intake_data?: any;
@@ -201,7 +210,7 @@ class ApiService {
   /**
    * Send chat message
    */
-  async sendChatMessage(request: ChatMessage): Promise<ChatResponse> {
+  async sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
     return this.makeRequest<ChatResponse>('/chat/message', {
       method: 'POST',
       body: JSON.stringify(request),

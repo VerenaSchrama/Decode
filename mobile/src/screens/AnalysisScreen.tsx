@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import { DailyProgressAPI } from '../services/dailyProgressApi';
 import { useAuth } from '../contexts/AuthContext';
+import CustomInterventionScreen from './CustomInterventionScreen';
 
 interface AnalysisScreenProps {
   intakeData?: any;
@@ -140,7 +141,7 @@ export default function AnalysisScreen({
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Mood & Food Diary</Text>
-          <Text style={styles.subtitle}>Track your progress and get expert insights</Text>
+          <Text style={styles.subtitle}>Get expert insights</Text>
         </View>
 
         {/* Weekly Summary */}

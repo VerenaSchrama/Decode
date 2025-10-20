@@ -15,17 +15,8 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../constants/colors';
-import { apiService } from '../services/apiService';
+import { apiService, ChatMessage } from '../services/apiService';
 import { useToast } from '../contexts/ToastContext';
-
-interface ChatMessage {
-  id: string;
-  user_id: string;
-  message: string;
-  is_user: boolean;
-  timestamp: string;
-  context_used?: any;
-}
 
 interface NutritionistChatScreenProps {
   intakeData?: any;
@@ -64,7 +55,7 @@ export default function NutritionistChatScreen({
         
         if (data.messages && data.messages.length > 0) {
           // Reverse to show oldest first
-          setMessages(data.messages.reverse());
+          setMessages([...data.messages].reverse());
           console.log('Loaded chat history from server:', data.messages.length, 'messages');
           return;
         }
