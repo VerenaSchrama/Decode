@@ -111,21 +111,21 @@ class AuthService:
             
             # Always create/update profile using service client to bypass RLS
             profile_data = {
-                "user_uuid": auth_response.user.id,
-                "email": user_data.email,
-                "name": user_data.name,
-                "age": user_data.age,
+                "user_id": auth_response.user.id,
                 "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
+                "dietary_preferences": user_data.dietary_preferences if hasattr(user_data, 'dietary_preferences') else [],
+                "cycle_length": user_data.cycle_length if hasattr(user_data, 'cycle_length') else None,
+                "consent": True,
                 "anonymous": user_data.anonymous
             }
             
             if self.service_client:
                 # Use upsert to handle both insert and update cases
                 # This will insert if not exists, update if exists
-                profile_result = self.service_client.table('user_profiles').upsert(profile_data).execute()
+                profile_result = self.service_client.table('profiles').upsert(profile_data).execute()
             else:
                 # Fallback to regular client (may fail due to RLS)
-                profile_result = self.client.table('user_profiles').upsert(profile_data).execute()
+                profile_result = self.client.table('profiles').upsert(profile_data).execute()
             
             return {
                 "success": True,
@@ -215,9 +215,9 @@ class AuthService:
             
             # Get user profile using service client (bypasses RLS)
             if self.service_client:
-                profile_result = self.service_client.table('user_profiles').select('*').eq('user_uuid', auth_response.user.id).execute()
+                profile_result = self.service_client.table('profiles').select('*').eq('user_id', auth_response.user.id).execute()
             else:
-                profile_result = self.client.table('user_profiles').select('*').eq('user_uuid', auth_response.user.id).execute()
+                profile_result = self.client.table('profiles').select('*').eq('user_id', auth_response.user.id).execute()
             
             if not profile_result.data:
                 raise HTTPException(
@@ -305,9 +305,9 @@ class AuthService:
         """
         try:
             if self.service_client:
-                result = self.service_client.table('user_profiles').select('*').eq('user_uuid', user_id).execute()
+                result = self.service_client.table('profiles').select('*').eq('user_id', user_id).execute()
             else:
-                result = self.client.table('user_profiles').select('*').eq('user_uuid', user_id).execute()
+                result = self.client.table('profiles').select('*').eq('user_id', user_id).execute()
             
             if not result.data:
                 raise HTTPException(
@@ -360,9 +360,9 @@ class AuthService:
             }
             
             if self.service_client:
-                result = self.service_client.table('user_profiles').update(update_data).eq('user_uuid', user_id).execute()
+                result = self.service_client.table('profiles').update(update_data).eq('user_id', user_id).execute()
             else:
-                result = self.client.table('user_profiles').update(update_data).eq('user_uuid', user_id).execute()
+                result = self.client.table('profiles').update(update_data).eq('user_id', user_id).execute()
             
             if not result.data:
                 raise HTTPException(
@@ -427,6 +427,31 @@ class AuthService:
             "success": False,
             "message": "Email confirmation is no longer required for this app."
         }
+    
+    async def reset_password(self, email: str) -> Dict[str, Any]:
+        """
+        Send password reset email to user
+        
+        Args:
+            email: User's email address
+            
+        Returns:
+            Password reset email status
+        """
+        try:
+            # Send password reset email
+            result = self.client.auth.reset_password_email(email)
+            
+            return {
+                "success": True,
+                "message": "Password reset email sent successfully"
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to send password reset email: {str(e)}"
+            }
 
 # Create global auth service instance
 auth_service = AuthService()

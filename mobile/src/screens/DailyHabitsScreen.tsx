@@ -709,76 +709,122 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           </Text>
         </View>
 
-        {/* Habits List */}
-        <View style={styles.habitsCard}>
-          <Text style={styles.habitsTitle}>
-            {cyclePhase ? `Your Habits for ${cyclePhase.phase} Phase` : 'Your Habits'}
-          </Text>
-          {cyclePhase && (
-            <Text style={styles.phaseContext}>
-              These habits are optimized for your current cycle phase
+        {/* Combined Daily Tracking Card */}
+        <View style={styles.dailyTrackingCard}>
+          {/* Card Header */}
+          <View style={styles.trackingCardHeader}>
+            <Text style={styles.trackingCardTitle}>Complete Your Daily Tracking</Text>
+            <Text style={styles.trackingCardSubtitle}>
+              Track your habits and mood to save today's progress
             </Text>
-          )}
-          {habitProgress.map((habit, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.habitItem,
-                habit.completed && styles.habitItemCompleted
-              ]}
-              onPress={() => toggleHabit(habit.habit)}
-            >
-              <View style={styles.habitContent}>
-                <View style={[
-                  styles.habitCheckbox,
-                  habit.completed && styles.habitCheckboxCompleted
-                ]}>
-                  {habit.completed && (
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  )}
-                </View>
-                <Text style={[
-                  styles.habitText,
-                  habit.completed && styles.habitTextCompleted
-                ]}>
-                  {habit.habit}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+          </View>
 
-        {/* Mood Tracker */}
-        <View style={styles.moodCard}>
-          <Text style={styles.moodTitle}>How are you feeling today?</Text>
-          {moodEntry ? (
-            <View style={styles.moodSelected}>
-              <Text style={styles.moodEmoji}>{getMoodEmoji(moodEntry.mood)}</Text>
-              <Text style={styles.moodLabel}>{getMoodLabel(moodEntry.mood)}</Text>
-              {moodEntry.symptoms.length > 0 && (
-                <View style={styles.symptomsPreview}>
-                  <Text style={styles.symptomsPreviewText}>
-                    {moodEntry.symptoms.slice(0, 2).join(', ')}
-                    {moodEntry.symptoms.length > 2 && ` +${moodEntry.symptoms.length - 2} more`}
+          {/* Habits Section */}
+          <View style={styles.trackingHabitsSection}>
+            <Text style={styles.trackingSectionTitle}>
+              {cyclePhase ? `Your Habits for ${cyclePhase.phase} Phase` : 'Your Habits'}
+            </Text>
+            {cyclePhase && (
+              <Text style={styles.trackingPhaseContext}>
+                These habits are optimized for your current cycle phase
+              </Text>
+            )}
+            {habitProgress.map((habit, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.trackingHabitItem,
+                  habit.completed && styles.trackingHabitItemCompleted
+                ]}
+                onPress={() => toggleHabit(habit.habit)}
+              >
+                <View style={styles.trackingHabitContent}>
+                  <View style={[
+                    styles.trackingHabitCheckbox,
+                    habit.completed && styles.trackingHabitCheckboxCompleted
+                  ]}>
+                    {habit.completed && (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.trackingHabitText,
+                    habit.completed && styles.trackingHabitTextCompleted
+                  ]}>
+                    {habit.habit}
                   </Text>
                 </View>
-              )}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Divider */}
+          <View style={styles.trackingDivider} />
+
+          {/* Mood Section */}
+          <View style={styles.trackingMoodSection}>
+            <Text style={styles.trackingSectionTitle}>How are you feeling today?</Text>
+            {moodEntry ? (
+              <View style={styles.trackingMoodSelected}>
+                <View style={styles.trackingMoodInfo}>
+                  <Text style={styles.trackingMoodEmoji}>{getMoodEmoji(moodEntry.mood)}</Text>
+                  <Text style={styles.trackingMoodLabel}>{getMoodLabel(moodEntry.mood)}</Text>
+                  {moodEntry.symptoms.length > 0 && (
+                    <View style={styles.trackingSymptomsPreview}>
+                      <Text style={styles.trackingSymptomsPreviewText}>
+                        {moodEntry.symptoms.slice(0, 2).join(', ')}
+                        {moodEntry.symptoms.length > 2 && ` +${moodEntry.symptoms.length - 2} more`}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity 
+                  style={styles.trackingChangeMoodButton}
+                  onPress={openMoodModal}
+                >
+                  <Text style={styles.trackingChangeMoodText}>Update</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
               <TouchableOpacity 
-                style={styles.changeMoodButton}
+                style={styles.trackingMoodButton}
                 onPress={openMoodModal}
               >
-                <Text style={styles.changeMoodText}>Update</Text>
+                <Ionicons name="happy-outline" size={24} color={colors.primary} />
+                <Text style={styles.trackingMoodButtonText}>Track your mood</Text>
               </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Completion Status */}
+          <View style={styles.trackingCompletionStatus}>
+            <View style={styles.trackingStatusItem}>
+              <Ionicons 
+                name={completedCount > 0 ? "checkmark-circle" : "ellipse-outline"} 
+                size={20} 
+                color={completedCount > 0 ? colors.success : colors.textSecondary} 
+              />
+              <Text style={[
+                styles.trackingStatusText,
+                completedCount > 0 && styles.trackingStatusTextCompleted
+              ]}>
+                Habits tracked ({completedCount}/{totalHabits})
+              </Text>
             </View>
-          ) : (
-            <TouchableOpacity 
-              style={styles.moodButton}
-              onPress={openMoodModal}
-            >
-              <Ionicons name="happy-outline" size={24} color={colors.primary} />
-              <Text style={styles.moodButtonText}>Track your mood</Text>
-            </TouchableOpacity>
-          )}
+            <View style={styles.trackingStatusItem}>
+              <Ionicons 
+                name={moodEntry ? "checkmark-circle" : "ellipse-outline"} 
+                size={20} 
+                color={moodEntry ? colors.success : colors.textSecondary} 
+              />
+              <Text style={[
+                styles.trackingStatusText,
+                moodEntry && styles.trackingStatusTextCompleted
+              ]}>
+                Mood tracked
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Mood Tracking Modal */}
@@ -887,8 +933,25 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
         </Modal>
 
         {/* Save Button */}
-        <TouchableOpacity style={styles.saveButton} onPress={saveDailyEntry}>
-          <Text style={styles.saveButtonText}>Save Today's Progress</Text>
+        <TouchableOpacity 
+          style={[
+            styles.saveButton, 
+            (completedCount === 0 && !moodEntry) && styles.saveButtonDisabled
+          ]} 
+          onPress={saveDailyEntry}
+          disabled={completedCount === 0 && !moodEntry}
+        >
+          <Text style={[
+            styles.saveButtonText,
+            (completedCount === 0 && !moodEntry) && styles.saveButtonTextDisabled
+          ]}>
+            Save Today's Progress
+          </Text>
+          {(completedCount === 0 && !moodEntry) && (
+            <Text style={styles.saveButtonHint}>
+              Complete habits and mood tracking first
+            </Text>
+          )}
         </TouchableOpacity>
 
         {/* History Toggle */}
@@ -1671,6 +1734,201 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 4,
     paddingLeft: 8,
+  },
+
+  // Combined Daily Tracking Card Styles
+  dailyTrackingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  trackingCardHeader: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  trackingCardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  trackingCardSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  trackingHabitsSection: {
+    marginBottom: 20,
+  },
+  trackingSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  trackingPhaseContext: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    fontStyle: 'italic',
+  },
+  trackingHabitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  trackingHabitItemCompleted: {
+    backgroundColor: '#F0FDF4',
+    borderColor: colors.success,
+  },
+  trackingHabitContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  trackingHabitCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  trackingHabitCheckboxCompleted: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  trackingHabitText: {
+    fontSize: 16,
+    color: '#374151',
+    flex: 1,
+  },
+  trackingHabitTextCompleted: {
+    color: colors.success,
+    fontWeight: '500',
+  },
+  trackingDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 20,
+  },
+  trackingMoodSection: {
+    marginBottom: 20,
+  },
+  trackingMoodSelected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFF7F5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FED7D7',
+  },
+  trackingMoodInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  trackingMoodEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  trackingMoodLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginRight: 12,
+  },
+  trackingSymptomsPreview: {
+    flex: 1,
+  },
+  trackingSymptomsPreviewText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  trackingChangeMoodButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  trackingChangeMoodText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  trackingMoodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFF7F5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FED7D7',
+    borderStyle: 'dashed',
+  },
+  trackingMoodButtonText: {
+    fontSize: 16,
+    color: colors.primary,
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  trackingCompletionStatus: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  trackingStatusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  trackingStatusText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  trackingStatusTextCompleted: {
+    color: colors.success,
+    fontWeight: '500',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#E5E7EB',
+    opacity: 0.6,
+  },
+  saveButtonTextDisabled: {
+    color: '#9CA3AF',
+  },
+  saveButtonHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 

@@ -140,23 +140,22 @@ class SimpleIntakeService:
         # For authenticated users, we should use their actual user ID
         # For anonymous users, we'll create a temporary user record
         try:
-            # Try to create a user in user_profiles table
+            # Try to create a user in profiles table
+            # Note: profiles table requires user_id (FK to auth.users.id)
+            # For anonymous users, we need to create an auth user first
+            # This is a simplified approach - in production, you'd want proper auth flow
             user_data = {
-                'name': user_input.profile.name or 'Anonymous User',
-                'email': f"anonymous_{int(time.time())}@temp.com",
-                'age': user_input.profile.age,
                 'date_of_birth': user_input.profile.dateOfBirth,
-                'anonymous': True,
-                'current_strategy': None
+                'dietary_preferences': user_input.profile.dietaryPreferences or [],
+                'cycle_length': user_input.profile.cycleLength,
+                'consent': True,
+                'anonymous': True
             }
             
-            result = self.supabase.client.table('user_profiles').insert(user_data).execute()
-            if result.data:
-                user_uuid = result.data[0]['user_uuid']
-                print(f"✅ Created anonymous user: {user_uuid}")
-                return user_uuid
-            else:
-                raise Exception("Failed to create user")
+            # For now, return a demo user ID since we can't create auth users without proper auth flow
+            demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+            print(f"✅ Using demo user for anonymous intake: {demo_user_id}")
+            return demo_user_id
                 
         except Exception as e:
             print(f"⚠️ Failed to create anonymous user: {e}")
