@@ -791,7 +791,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                 onPress={openMoodModal}
               >
                 <Ionicons name="happy-outline" size={24} color={colors.primary} />
-                <Text style={styles.trackingMoodButtonText}>Track your mood</Text>
+                <Text style={styles.trackingMoodButtonText}>Choose your mood</Text>
               </TouchableOpacity>
             )}
           </View>
