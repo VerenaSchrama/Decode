@@ -70,7 +70,9 @@ class AuthService {
    * Logout user
    */
   async logout(accessToken: string): Promise<void> {
+    console.log('🔴 AuthService: logout called with token:', accessToken ? 'present' : 'missing');
     try {
+      console.log('🔴 AuthService: Making logout request to:', `${this.baseUrl}/auth/logout`);
       const response = await fetch(`${this.baseUrl}/auth/logout`, {
         method: 'POST',
         headers: {
@@ -79,11 +81,14 @@ class AuthService {
         },
       });
 
+      console.log('🔴 AuthService: Logout response status:', response.status);
       if (!response.ok) {
-        console.warn('Logout request failed:', response.status);
+        console.warn('🔴 AuthService: Logout request failed:', response.status);
+      } else {
+        console.log('🔴 AuthService: Logout request successful');
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('🔴 AuthService: Logout error:', error);
       // Don't throw error for logout - user should be logged out locally anyway
     }
   }

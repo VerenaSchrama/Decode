@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   SafeAreaView,
   Alert,
@@ -22,6 +21,7 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
   const intakeData = route?.params?.intakeData;
 
   const handleLogout = () => {
+    console.log('🔴 ProfileScreen: handleLogout called');
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
@@ -29,15 +29,18 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
         {
           text: 'Cancel',
           style: 'cancel',
+          onPress: () => console.log('🔴 ProfileScreen: Logout cancelled'),
         },
         {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
+            console.log('🔴 ProfileScreen: Logout confirmed, calling logout()');
             try {
               await logout();
+              console.log('🔴 ProfileScreen: Logout completed successfully');
             } catch (error) {
-              console.error('Logout error:', error);
+              console.error('🔴 ProfileScreen: Logout error:', error);
             }
           },
         },
@@ -84,7 +87,7 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
@@ -233,12 +236,29 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
           </TouchableOpacity>
         </View>
 
+        {/* Test Button */}
+        <TouchableOpacity 
+          style={[styles.logoutButton, { backgroundColor: '#10B981', marginBottom: 10 }]} 
+          onPress={() => console.log('🔴 Test button pressed!')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+          <Text style={[styles.logoutText, { color: '#FFFFFF' }]}>Test Button</Text>
+        </TouchableOpacity>
+
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={() => {
+            console.log('🔴 Direct onPress called!');
+            handleLogout();
+          }}
+          activeOpacity={0.7}
+        >
           <Ionicons name="log-out" size={20} color="#EF4444" />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }

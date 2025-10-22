@@ -242,15 +242,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = async () => {
+    console.log('🔴 AuthContext: logout called');
     try {
       if (state.session?.access_token) {
+        console.log('🔴 AuthContext: Calling authService.logout');
         await authService.logout(state.session.access_token);
+        console.log('🔴 AuthContext: authService.logout completed');
+      } else {
+        console.log('🔴 AuthContext: No access token found');
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('🔴 AuthContext: Logout error:', error);
     } finally {
+      console.log('🔴 AuthContext: Clearing stored auth and dispatching logout');
       await clearStoredAuth();
       dispatch({ type: 'AUTH_LOGOUT' });
+      console.log('🔴 AuthContext: Logout completed');
     }
   };
 
