@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   TouchableOpacity,
   SafeAreaView,
   Alert,
@@ -87,7 +88,13 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
@@ -241,6 +248,7 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
           style={[styles.logoutButton, { backgroundColor: '#10B981', marginBottom: 10 }]} 
           onPress={() => console.log('🔴 Test button pressed!')}
           activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="checkmark" size={20} color="#FFFFFF" />
           <Text style={[styles.logoutText, { color: '#FFFFFF' }]}>Test Button</Text>
@@ -254,11 +262,12 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
             handleLogout();
           }}
           activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="log-out" size={20} color="#EF4444" />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -270,7 +279,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   header: {
     alignItems: 'center',

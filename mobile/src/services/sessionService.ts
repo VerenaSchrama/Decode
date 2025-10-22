@@ -3,6 +3,8 @@
  * Handles user session data restoration and management
  */
 
+import { getApiConfig } from '../config/environment';
+
 export interface SessionData {
   user_id: string;
   intake_data: {
@@ -34,7 +36,9 @@ export interface SessionResponse {
 }
 
 export class SessionService {
-  private static baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+  private static get baseUrl(): string {
+    return getApiConfig().baseUrl;
+  }
 
   /**
    * Get complete user session data for app restoration
