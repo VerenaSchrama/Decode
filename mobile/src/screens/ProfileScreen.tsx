@@ -23,30 +23,37 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
 
   const handleLogout = () => {
     console.log('🔴 ProfileScreen: handleLogout called');
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => console.log('🔴 ProfileScreen: Logout cancelled'),
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('🔴 ProfileScreen: Logout confirmed, calling logout()');
-            try {
-              await logout();
-              console.log('🔴 ProfileScreen: Logout completed successfully');
-            } catch (error) {
-              console.error('🔴 ProfileScreen: Logout error:', error);
-            }
+    console.log('🔴 ProfileScreen: About to show Alert.alert');
+    
+    try {
+      Alert.alert(
+        'Sign Out',
+        'Are you sure you want to sign out?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => console.log('🔴 ProfileScreen: Logout cancelled'),
           },
-        },
-      ]
-    );
+          {
+            text: 'Sign Out',
+            style: 'destructive',
+            onPress: async () => {
+              console.log('🔴 ProfileScreen: Logout confirmed, calling logout()');
+              try {
+                await logout();
+                console.log('🔴 ProfileScreen: Logout completed successfully');
+              } catch (error) {
+                console.error('🔴 ProfileScreen: Logout error:', error);
+              }
+            },
+          },
+        ]
+      );
+      console.log('🔴 ProfileScreen: Alert.alert called successfully');
+    } catch (error) {
+      console.error('🔴 ProfileScreen: Error showing alert:', error);
+    }
   };
   const profileData = intakeData || {
     profile: { name: 'User', dateOfBirth: '1990-01-01' },
@@ -246,7 +253,10 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
         {/* Test Button */}
         <TouchableOpacity 
           style={[styles.logoutButton, { backgroundColor: '#10B981', marginBottom: 10 }]} 
-          onPress={() => console.log('🔴 Test button pressed!')}
+          onPress={() => {
+            console.log('🔴 Test button pressed!');
+            Alert.alert('Test Alert', 'This is a test alert to verify Alert.alert works');
+          }}
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
