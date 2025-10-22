@@ -18,6 +18,7 @@ export interface AuthSession {
   access_token: string;
   refresh_token: string;
   expires_at: string;
+  created_at?: number;
 }
 
 export interface LoginRequest {

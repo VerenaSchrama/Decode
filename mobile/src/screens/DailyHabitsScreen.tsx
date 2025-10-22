@@ -305,6 +305,9 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const [isSavingProgress, setIsSavingProgress] = useState(false);
   const [saveTimeoutId, setSaveTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [currentStreak, setCurrentStreak] = useState<number>(0);
+  const [isTodayTracked, setIsTodayTracked] = useState<boolean>(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(true);
+  const [todayDate, setTodayDate] = useState<string>('');
   const { showToast } = useToast();
   const { user } = useAuth();
 
@@ -336,6 +339,31 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
     } catch (error) {
       console.error('❌ Error loading streak:', error);
       showToast('Failed to load streak data', 'error');
+    }
+  };
+
+  const checkTodayTrackingStatus = async () => {
+    try {
+      setIsCheckingStatus(true);
+      const userId = user?.id || 'demo-user-123';
+      const today = new Date().toISOString().split('T')[0];
+      setTodayDate(today);
+      
+      console.log('🔄 Checking tracking status for today:', today);
+      const statusResponse = await DailyProgressAPI.getDailyProgressStatus(userId, today);
+      
+      console.log('✅ Tracking status:', statusResponse);
+      setIsTodayTracked(statusResponse.is_tracked);
+      
+      if (statusResponse.is_tracked) {
+        showToast('You\'ve already tracked your progress for today!', 'info');
+      }
+    } catch (error) {
+      console.error('❌ Error checking tracking status:', error);
+      // If check fails, assume we can track (fail open)
+      setIsTodayTracked(false);
+    } finally {
+      setIsCheckingStatus(false);
     }
   };
 
@@ -387,10 +415,11 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
     }
   };
 
-  // Load current streak and history on component mount
+  // Load current streak, history, and check today's tracking status on component mount
   useEffect(() => {
     loadCurrentStreak();
     loadDailyHabitsHistory();
+    checkTodayTrackingStatus();
   }, []);
 
   // Refresh data when screen comes into focus
@@ -399,6 +428,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       console.log('🎯 DailyHabitsScreen: Screen focused, refreshing data...');
       loadCurrentStreak();
       loadDailyHabitsHistory();
+      checkTodayTrackingStatus();
     }, [])
   );
 
@@ -464,6 +494,12 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const saveProgressToAPI = async () => {
     if (isSavingProgress) return;
     
+    // Check if today is already tracked
+    if (isTodayTracked) {
+      showToast('You\'ve already tracked your progress for today!', 'warning');
+      return;
+    }
+    
     setIsSavingProgress(true);
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -491,6 +527,10 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       // Update streak after saving
       const streakResponse = await apiService.getHabitStreak(user?.id || 'demo-user-123');
       setCurrentStreak(streakResponse.current_streak);
+      
+      // Mark today as tracked
+      setIsTodayTracked(true);
+      
       showToast('Progress saved successfully!', 'success');
 
     } catch (error) {
@@ -502,6 +542,12 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   };
 
   const toggleHabit = (habit: string) => {
+    // Don't allow toggling if today is already tracked
+    if (isTodayTracked) {
+      showToast('You\'ve already tracked your progress for today!', 'warning');
+      return;
+    }
+    
     console.log('🔄 Toggling habit:', habit);
     setHabitProgress(prev => {
       const updated = prev.map(h => 
@@ -526,6 +572,12 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   };
 
   const openMoodModal = () => {
+    // Don't allow mood tracking if today is already tracked
+    if (isTodayTracked) {
+      showToast('You\'ve already tracked your progress for today!', 'warning');
+      return;
+    }
+    
     if (moodEntry) {
       setTempMood(moodEntry.mood);
       setTempSymptoms([...moodEntry.symptoms]);
@@ -734,9 +786,11 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                 key={index}
                 style={[
                   styles.trackingHabitItem,
-                  habit.completed && styles.trackingHabitItemCompleted
+                  habit.completed && styles.trackingHabitItemCompleted,
+                  isTodayTracked && styles.trackingHabitItemLocked
                 ]}
                 onPress={() => toggleHabit(habit.habit)}
+                disabled={isTodayTracked}
               >
                 <View style={styles.trackingHabitContent}>
                   <View style={[
@@ -779,19 +833,37 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                   )}
                 </View>
                 <TouchableOpacity 
-                  style={styles.trackingChangeMoodButton}
+                  style={[
+                    styles.trackingChangeMoodButton,
+                    isTodayTracked && styles.trackingMoodButtonLocked
+                  ]}
                   onPress={openMoodModal}
+                  disabled={isTodayTracked}
                 >
-                  <Text style={styles.trackingChangeMoodText}>Update</Text>
+                  <Text style={[
+                    styles.trackingChangeMoodText,
+                    isTodayTracked && styles.trackingMoodTextLocked
+                  ]}>Update</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity 
-                style={styles.trackingMoodButton}
+                style={[
+                  styles.trackingMoodButton,
+                  isTodayTracked && styles.trackingMoodButtonLocked
+                ]}
                 onPress={openMoodModal}
+                disabled={isTodayTracked}
               >
-                <Ionicons name="happy-outline" size={24} color={colors.primary} />
-                <Text style={styles.trackingMoodButtonText}>Choose your mood</Text>
+                <Ionicons 
+                  name="happy-outline" 
+                  size={24} 
+                  color={isTodayTracked ? '#9CA3AF' : colors.primary} 
+                />
+                <Text style={[
+                  styles.trackingMoodButtonText,
+                  isTodayTracked && styles.trackingMoodTextLocked
+                ]}>Choose your mood</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -936,20 +1008,32 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
         <TouchableOpacity 
           style={[
             styles.saveButton, 
-            (completedCount === 0 && !moodEntry) && styles.saveButtonDisabled
+            (completedCount === 0 && !moodEntry) && styles.saveButtonDisabled,
+            isTodayTracked && styles.saveButtonLocked
           ]} 
           onPress={saveDailyEntry}
-          disabled={completedCount === 0 && !moodEntry}
+          disabled={(completedCount === 0 && !moodEntry) || isTodayTracked || isCheckingStatus}
         >
           <Text style={[
             styles.saveButtonText,
-            (completedCount === 0 && !moodEntry) && styles.saveButtonTextDisabled
+            (completedCount === 0 && !moodEntry) && styles.saveButtonTextDisabled,
+            isTodayTracked && styles.saveButtonTextLocked
           ]}>
-            Save Today's Progress
+            {isTodayTracked ? '✓ Already Tracked Today' : 'Save Today\'s Progress'}
           </Text>
-          {(completedCount === 0 && !moodEntry) && (
+          {(completedCount === 0 && !moodEntry) && !isTodayTracked && (
             <Text style={styles.saveButtonHint}>
               Complete habits and mood tracking first
+            </Text>
+          )}
+          {isTodayTracked && (
+            <Text style={styles.saveButtonHint}>
+              You can track again tomorrow at 00:01
+            </Text>
+          )}
+          {isCheckingStatus && (
+            <Text style={styles.saveButtonHint}>
+              Checking today's status...
             </Text>
           )}
         </TouchableOpacity>
@@ -1795,6 +1879,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
     borderColor: colors.success,
   },
+  trackingHabitItemLocked: {
+    backgroundColor: '#F9FAFB',
+    borderColor: '#E5E7EB',
+    opacity: 0.6,
+  },
   trackingHabitContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1895,6 +1984,14 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '500',
   },
+  trackingMoodButtonLocked: {
+    backgroundColor: '#F9FAFB',
+    borderColor: '#E5E7EB',
+    opacity: 0.6,
+  },
+  trackingMoodTextLocked: {
+    color: '#9CA3AF',
+  },
   trackingCompletionStatus: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1920,8 +2017,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     opacity: 0.6,
   },
+  saveButtonLocked: {
+    backgroundColor: '#D1FAE5',
+    borderColor: '#10B981',
+    borderWidth: 2,
+  },
   saveButtonTextDisabled: {
     color: '#9CA3AF',
+  },
+  saveButtonTextLocked: {
+    color: '#10B981',
+    fontWeight: '600',
   },
   saveButtonHint: {
     fontSize: 12,

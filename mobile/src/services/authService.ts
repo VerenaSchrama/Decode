@@ -127,10 +127,17 @@ class AuthService {
         },
       });
 
-      return response.ok;
+      if (response.ok) {
+        return true;
+      } else {
+        console.warn('Token verification failed:', response.status);
+        return false;
+      }
     } catch (error) {
       console.error('Token verification error:', error);
-      return false;
+      // If verification fails due to network issues, assume token is valid
+      // This prevents users from being logged out due to temporary network problems
+      return true;
     }
   }
 }

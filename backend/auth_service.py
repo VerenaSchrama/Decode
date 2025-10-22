@@ -276,10 +276,11 @@ class AuthService:
             Logout confirmation
         """
         try:
-            # Set the session for the client
+            # Secure logout: Invalidate session on server side
+            # Set the session for the client to ensure proper cleanup
             self.client.auth.set_session(access_token, "")
             
-            # Sign out the user
+            # Sign out the user - this invalidates the session
             self.client.auth.sign_out()
             
             return {

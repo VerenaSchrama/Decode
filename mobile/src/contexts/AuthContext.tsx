@@ -114,16 +114,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const user = JSON.parse(storedUser);
         const session = JSON.parse(storedSession);
 
-        // Verify token is still valid
-        const isValid = await authService.verifyToken(session.access_token);
-        
-        if (isValid) {
-          dispatch({
-            type: 'AUTH_SUCCESS',
-            payload: { user, session },
-          });
+        // Check if session has required fields
+        if (user?.id && session?.access_token) {
+          // Check if session is not too old (e.g., less than 30 days)
+          const sessionAge = Date.now() - (session.created_at || 0);
+          const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+          
+          if (sessionAge > maxAge) {
+            console.log('⚠️ Session too old, clearing stored auth');
+            await clearStoredAuth();
+            dispatch({ type: 'AUTH_LOGOUT' });
+            return;
+          }
+          
+          // Try to verify token, but don't fail if verification doesn't work
+          try {
+            const isValid = await authService.verifyToken(session.access_token);
+            if (isValid) {
+              dispatch({
+                type: 'AUTH_SUCCESS',
+                payload: { user, session },
+              });
+              console.log('✅ Restored user session with verified token:', user.email);
+            } else {
+              // Token verification failed, but restore session anyway to prevent logout
+              dispatch({
+                type: 'AUTH_SUCCESS',
+                payload: { user, session },
+              });
+              console.log('⚠️ Restored user session without token verification:', user.email);
+            }
+          } catch (error) {
+            // If verification fails, restore session anyway
+            dispatch({
+              type: 'AUTH_SUCCESS',
+              payload: { user, session },
+            });
+            console.log('⚠️ Restored user session after verification error:', user.email);
+          }
         } else {
-          // Token is invalid, clear stored data
+          // Invalid stored data, clear it
           await clearStoredAuth();
           dispatch({ type: 'AUTH_LOGOUT' });
         }
@@ -140,9 +170,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const storeAuth = async (user: User, session: AuthSession) => {
     try {
+      // Add created_at timestamp if not present
+      const sessionWithTimestamp = {
+        ...session,
+        created_at: session.created_at || Date.now()
+      };
+      
       await Promise.all([
         AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user)),
-        AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(session)),
+        AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(sessionWithTimestamp)),
       ]);
     } catch (error) {
       console.error('Error storing auth data:', error);

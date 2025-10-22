@@ -126,6 +126,27 @@ export class DailyProgressAPI {
       throw error;
     }
   }
+
+  /**
+   * Check if user has already tracked progress for a specific date
+   */
+  static async getDailyProgressStatus(
+    userId: string,
+    date: string
+  ): Promise<{ success: boolean; date: string; is_tracked: boolean; can_track: boolean; message: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/user/${userId}/daily-progress/${date}/status`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error checking daily progress status:', error);
+      throw error;
+    }
+  }
 }
 
 export interface DailyHabitsHistoryEntry {

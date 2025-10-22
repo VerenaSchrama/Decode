@@ -449,6 +449,78 @@ async def get_phase_aware_habits(
             detail=f"Error getting phase habits: {str(e)}"
         )
 
+# Global variable to track demo user daily progress (simple in-memory approach)
+demo_user_tracked_dates = set()
+
+@app.get("/user/{user_id}/daily-progress/{date}/status")
+async def get_daily_progress_status(user_id: str, date: str):
+    """
+    Check if user has already tracked progress for a specific date
+    
+    Args:
+        user_id: User ID
+        date: Date in YYYY-MM-DD format
+        
+    Returns:
+        Status indicating if the date is already tracked
+    """
+    try:
+        from models import supabase_client
+        from datetime import datetime
+        
+        # Map user_id to user_uuid
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'
+        
+        if user_id == 'demo-user-123':
+            db_user_uuid = demo_user_uuid
+        else:
+            db_user_uuid = user_id
+        
+        # For demo users, use a simple in-memory approach
+        if user_id == 'demo-user-123':
+            # Check our global tracking set
+            is_tracked = date in demo_user_tracked_dates
+            print(f"DEBUG: Demo user status check for {date}: is_tracked={is_tracked}")
+        else:
+            # For authenticated users, use the normal approach
+            result = supabase_client.client.table('daily_summaries')\
+                .select('id, entry_date, created_at')\
+                .eq('user_id', db_user_uuid)\
+                .eq('entry_date', date)\
+                .execute()
+            
+            is_tracked = len(result.data) > 0
+            
+            # If no daily_summaries found, check daily_habit_entries as fallback
+            if not is_tracked:
+                try:
+                    habit_result = supabase_client.client.table('daily_habit_entries')\
+                        .select('id, entry_date')\
+                        .eq('user_id', db_user_uuid)\
+                        .eq('entry_date', date)\
+                        .execute()
+                    
+                    is_tracked = len(habit_result.data) > 0
+                    print(f"DEBUG: Fallback check in daily_habit_entries found {len(habit_result.data)} entries")
+                except Exception as e:
+                    print(f"DEBUG: Fallback check failed: {e}")
+        
+        print(f"DEBUG: Status check for {date}: is_tracked={is_tracked}")
+        
+        return {
+            "success": True,
+            "date": date,
+            "is_tracked": is_tracked,
+            "can_track": not is_tracked,
+            "message": "Already tracked for this date" if is_tracked else "Can track for this date"
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error checking daily progress status: {str(e)}"
+        )
+
 @app.post("/daily-progress")
 async def save_daily_progress(request: dict, authorization: str = Header(None)):
     """
@@ -470,19 +542,43 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         from datetime import datetime
         
         user_id = request.get('user_id', 'demo-user-123')
-        
-        # For authenticated users, get their profile to use user_uuid
-        if authorization and authorization.startswith("Bearer "):
-            try:
-                # TODO: Implement proper authentication
-                print("⚠️ Authentication not implemented yet, using demo user")
-            except Exception as e:
-                print(f"⚠️ Token verification error: {e}, using demo user")
-        
-        # For demo users, use simple mapping
-        if user_id == 'demo-user-123':
-            user_id = 'demo-user-123'  # Keep as string for now
         entry_date = request.get('entry_date', datetime.now().strftime('%Y-%m-%d'))
+        
+        # Map user_id to user_uuid for database operations
+        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'
+        
+        if user_id == 'demo-user-123':
+            db_user_uuid = demo_user_uuid
+        else:
+            db_user_uuid = user_id
+        
+        # Check if user has already tracked progress for this date
+        if user_id == 'demo-user-123':
+            # For demo users, check our global tracking set
+            if entry_date in demo_user_tracked_dates:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Daily progress already tracked for {entry_date}. Only one entry per day is allowed."
+                )
+        else:
+            # For authenticated users, check the database
+            try:
+                existing_result = supabase_client.client.table('daily_summaries')\
+                    .select('id, entry_date')\
+                    .eq('user_id', db_user_uuid)\
+                    .eq('entry_date', entry_date)\
+                    .execute()
+                
+                if len(existing_result.data) > 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Daily progress already tracked for {entry_date}. Only one entry per day is allowed."
+                    )
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"Warning: Could not check existing entries: {e}")
+                # Continue with save operation if check fails
         habits = request.get('habits', [])
         mood = request.get('mood', None)
         cycle_phase = request.get('cycle_phase', 'follicular')
@@ -508,19 +604,8 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'created_at': datetime.now().isoformat()
         }
         
-        # Handle demo users differently to avoid foreign key constraints
-        if user_id == 'demo-user-123':
-            # For demo users, we'll store data in a way that doesn't require foreign keys
-            # We'll use a special demo user ID that we can create in the database
-            db_user_uuid = 'demo-user-123'  # Use string ID for demo users
-            
-            # For demo users, we'll store data in a simplified way
-            # that doesn't require the profiles table foreign key constraint
-            print(f"DEBUG: Using demo user approach for {user_id}")
-        else:
-            # For authenticated users, use their actual UUID
-            # TODO: Implement proper user UUID lookup
-            db_user_uuid = user_id  # Use the provided user_id
+        # Use the db_user_uuid we already determined above
+        print(f"DEBUG: Using db_user_uuid: {db_user_uuid} for user_id: {user_id}")
         
         # NEW SCHEMA: Create individual entries for each habit
         entry_ids = []
@@ -565,6 +650,44 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 entry_id = f"demo-{entry_date}-{habit_id}"
                 entry_ids.append(entry_id)
                 print(f"DEBUG: Demo user entry created: {entry_id}")
+                
+                # Add to our global tracking set
+                demo_user_tracked_dates.add(entry_date)
+                print(f"DEBUG: Added {entry_date} to demo user tracked dates")
+                
+                # Store demo user data in daily_habit_entries table for status checking
+                try:
+                    daily_entry_data = {
+                        'user_id': db_user_uuid,
+                        'habit_id': habit_id,
+                        'entry_date': entry_date,
+                        'completed': habit.get('completed', False),
+                        'mood': mood.get('mood') if mood else None,
+                        'notes': mood.get('notes', '') if mood else ''
+                    }
+                    entry_result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
+                    print(f"DEBUG: Demo user daily entry stored: {entry_result.data}")
+                except Exception as e:
+                    print(f"DEBUG: Could not store daily entry for demo user: {e}")
+                    # Continue without failing the main operation
+                
+                # Also create a daily_summaries entry for demo users to enable status checking
+                try:
+                    daily_summary_data = {
+                        'user_id': db_user_uuid,
+                        'entry_date': entry_date,
+                        'completion_percentage': completion_percentage,
+                        'mood': mood.get('mood') if mood else None,
+                        'notes': mood.get('notes', '') if mood else '',
+                        'cycle_phase': cycle_phase,
+                        'total_habits': total_habits,
+                        'completed_habits': len(completed_habits)
+                    }
+                    summary_result = supabase_client.client.table('daily_summaries').insert(daily_summary_data).execute()
+                    print(f"DEBUG: Demo user daily summary created: {summary_result.data}")
+                except Exception as e:
+                    print(f"DEBUG: Could not create daily summary for demo user: {e}")
+                    # Continue without failing the main operation
             else:
                 # For authenticated users, use the normal daily_habit_entries table
                 daily_entry_data = {
