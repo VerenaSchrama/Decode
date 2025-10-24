@@ -33,22 +33,26 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
           {
             text: 'Cancel',
             style: 'cancel',
-            onPress: () => console.log('🔴 ProfileScreen: Logout cancelled'),
+            onPress: () => {
+              console.log('🔴 ProfileScreen: Logout cancelled');
+            },
           },
           {
             text: 'Sign Out',
             style: 'destructive',
-            onPress: async () => {
-              console.log('🔴 ProfileScreen: Logout confirmed, calling logout()');
-              try {
-                await logout();
+            onPress: () => {
+              console.log('🔴 ProfileScreen: Sign Out button pressed in alert');
+              console.log('🔴 ProfileScreen: About to call logout()');
+              
+              logout().then(() => {
                 console.log('🔴 ProfileScreen: Logout completed successfully');
-              } catch (error) {
+              }).catch((error) => {
                 console.error('🔴 ProfileScreen: Logout error:', error);
-              }
+              });
             },
           },
-        ]
+        ],
+        { cancelable: true }
       );
       console.log('🔴 ProfileScreen: Alert.alert called successfully');
     } catch (error) {
@@ -262,6 +266,25 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
         >
           <Ionicons name="checkmark" size={20} color="#FFFFFF" />
           <Text style={[styles.logoutText, { color: '#FFFFFF' }]}>Test Button</Text>
+        </TouchableOpacity>
+
+        {/* Direct Logout Button (Test) */}
+        <TouchableOpacity 
+          style={[styles.logoutButton, { backgroundColor: '#F59E0B', marginBottom: 10 }]} 
+          onPress={() => {
+            console.log('🔴 Direct logout button pressed!');
+            console.log('🔴 About to call logout() directly');
+            logout().then(() => {
+              console.log('🔴 Direct logout completed successfully');
+            }).catch((error) => {
+              console.error('🔴 Direct logout error:', error);
+            });
+          }}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="log-out" size={20} color="#FFFFFF" />
+          <Text style={[styles.logoutText, { color: '#FFFFFF' }]}>Direct Logout</Text>
         </TouchableOpacity>
 
         {/* Logout Button */}
