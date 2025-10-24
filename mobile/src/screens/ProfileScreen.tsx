@@ -22,42 +22,11 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
   const intakeData = route?.params?.intakeData;
 
   const handleLogout = () => {
-    console.log('🔴 ProfileScreen: handleLogout called');
-    console.log('🔴 ProfileScreen: About to show Alert.alert');
-    
-    try {
-      Alert.alert(
-        'Sign Out',
-        'Are you sure you want to sign out?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => {
-              console.log('🔴 ProfileScreen: Logout cancelled');
-            },
-          },
-          {
-            text: 'Sign Out',
-            style: 'destructive',
-            onPress: () => {
-              console.log('🔴 ProfileScreen: Sign Out button pressed in alert');
-              console.log('🔴 ProfileScreen: About to call logout()');
-              
-              logout().then(() => {
-                console.log('🔴 ProfileScreen: Logout completed successfully');
-              }).catch((error) => {
-                console.error('🔴 ProfileScreen: Logout error:', error);
-              });
-            },
-          },
-        ],
-        { cancelable: true }
-      );
-      console.log('🔴 ProfileScreen: Alert.alert called successfully');
-    } catch (error) {
-      console.error('🔴 ProfileScreen: Error showing alert:', error);
-    }
+    logout().then(() => {
+      console.log('✅ Logout completed successfully');
+    }).catch((error) => {
+      console.error('❌ Logout error:', error);
+    });
   };
   const profileData = intakeData || {
     profile: { name: 'User', dateOfBirth: '1990-01-01' },
@@ -254,46 +223,10 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
           </TouchableOpacity>
         </View>
 
-        {/* Test Button */}
-        <TouchableOpacity 
-          style={[styles.logoutButton, { backgroundColor: '#10B981', marginBottom: 10 }]} 
-          onPress={() => {
-            console.log('🔴 Test button pressed!');
-            Alert.alert('Test Alert', 'This is a test alert to verify Alert.alert works');
-          }}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="checkmark" size={20} color="#FFFFFF" />
-          <Text style={[styles.logoutText, { color: '#FFFFFF' }]}>Test Button</Text>
-        </TouchableOpacity>
-
-        {/* Direct Logout Button (Test) */}
-        <TouchableOpacity 
-          style={[styles.logoutButton, { backgroundColor: '#F59E0B', marginBottom: 10 }]} 
-          onPress={() => {
-            console.log('🔴 Direct logout button pressed!');
-            console.log('🔴 About to call logout() directly');
-            logout().then(() => {
-              console.log('🔴 Direct logout completed successfully');
-            }).catch((error) => {
-              console.error('🔴 Direct logout error:', error);
-            });
-          }}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="log-out" size={20} color="#FFFFFF" />
-          <Text style={[styles.logoutText, { color: '#FFFFFF' }]}>Direct Logout</Text>
-        </TouchableOpacity>
-
-        {/* Logout Button */}
+        {/* Sign Out Button */}
         <TouchableOpacity 
           style={styles.logoutButton} 
-          onPress={() => {
-            console.log('🔴 Direct onPress called!');
-            handleLogout();
-          }}
+          onPress={handleLogout}
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
