@@ -47,6 +47,7 @@ export interface StoryIntakeData {
   dietaryPreferences: DietaryPreferences;
   consent: boolean;
   anonymous: boolean;
+  intake_id?: string; // ID returned from backend after intake submission
 }
 
 export interface StoryIntakeStep {

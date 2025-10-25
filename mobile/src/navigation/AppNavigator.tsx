@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Alert } from 'react-native';
 import { StoryIntakeData } from '../types/StoryIntake';
 import TestScreen from '../screens/TestScreen';
 import StoryIntakeScreen from '../screens/StoryIntakeScreen';
@@ -81,7 +81,7 @@ export default function AppNavigator({
     if (session?.access_token && intakeData) {
       try {
         const startRequest = {
-          intake_id: intakeData.id || 'temp-intake-id', // Use intake ID if available
+          intake_id: intakeData.intake_id || intakeData.id || 'temp-intake-id', // Use intake ID if available
           intervention_name: intervention.name,
           selected_habits: interventionHabits,
           intervention_id: intervention.id,
@@ -97,7 +97,14 @@ export default function AppNavigator({
         if (result.success) {
           console.log('✅ Intervention period tracking started:', result.period_id);
         } else {
-          console.warn('⚠️ Failed to start intervention period tracking:', result.error);
+          console.error('❌ Failed to start intervention period tracking:', result.error);
+          // Show user-friendly error message
+          Alert.alert(
+            'Tracking Error',
+            'Failed to start tracking your intervention. Please try again or contact support.',
+            [{ text: 'OK' }]
+          );
+          return; // Don't continue to habit selection if tracking fails
         }
       } catch (error) {
         console.error('❌ Error starting intervention period tracking:', error);

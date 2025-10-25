@@ -86,6 +86,41 @@ export class InterventionPeriodService {
   }
 
   /**
+   * Get all intervention periods for a user
+   */
+  async getUserInterventionPeriods(
+    accessToken: string
+  ): Promise<{ success: boolean; periods?: InterventionPeriod[]; count?: number; error?: string }> {
+    try {
+      const response = await api.get('/intervention-periods/history', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.status === 200) {
+        return {
+          success: true,
+          periods: response.data.periods || [],
+          count: response.data.count || 0
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.detail || 'Failed to get intervention periods'
+        };
+      }
+    } catch (error: any) {
+      console.error('Error getting user intervention periods:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.message || 'Failed to get intervention periods'
+      };
+    }
+  }
+
+  /**
    * Get the currently active intervention period
    */
   async getActiveInterventionPeriod(

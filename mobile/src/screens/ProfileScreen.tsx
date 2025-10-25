@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import { useAuth } from '../contexts/AuthContext';
+import { interventionPeriodService } from '../services/interventionPeriodService';
 import { RouteProp } from '@react-navigation/native';
 
 interface ProfileScreenProps {
@@ -20,6 +21,36 @@ interface ProfileScreenProps {
 export default function ProfileScreen({ route }: ProfileScreenProps) {
   const { user, logout } = useAuth();
   const intakeData = route?.params?.intakeData;
+  const [interventionPeriods, setInterventionPeriods] = useState<any[]>([]);
+  const [loadingInterventions, setLoadingInterventions] = useState(true);
+
+  useEffect(() => {
+    loadInterventionPeriods();
+  }, [user]);
+
+  const loadInterventionPeriods = async () => {
+    if (!user?.id) {
+      setLoadingInterventions(false);
+      return;
+    }
+
+    try {
+      setLoadingInterventions(true);
+      const result = await interventionPeriodService.getUserInterventionPeriods(user.id);
+      
+      if (result.success) {
+        setInterventionPeriods(result.periods || []);
+      } else {
+        console.error('Failed to load intervention periods:', result.error);
+        setInterventionPeriods([]);
+      }
+    } catch (error) {
+      console.error('Error loading intervention periods:', error);
+      setInterventionPeriods([]);
+    } finally {
+      setLoadingInterventions(false);
+    }
+  };
 
   const handleLogout = () => {
     logout().then(() => {
@@ -138,36 +169,31 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
             <Ionicons name="flask" size={20} color={colors.primary} />
             <Text style={styles.cardTitle}>Tried Interventions</Text>
           </View>
-          {profileData.interventions?.selected?.length > 0 ? (
+          {loadingInterventions ? (
+            <Text style={styles.emptyText}>Loading interventions...</Text>
+          ) : interventionPeriods.length > 0 ? (
             <View style={styles.interventionsList}>
-              {profileData.interventions.selected.map((intervention: any, index: number) => (
-                <View key={index} style={styles.interventionItem}>
+              {interventionPeriods.map((period: any, index: number) => (
+                <View key={period.id || index} style={styles.interventionItem}>
                   <Text style={styles.interventionName}>
-                    {intervention.intervention || intervention}
+                    {period.intervention_name}
                   </Text>
-                  {intervention.helpful !== undefined && (
-                    <View style={[
-                      styles.helpfulnessTag,
-                      intervention.helpful ? styles.helpfulTag : styles.notHelpfulTag
-                    ]}>
-                      <Text style={[
-                        styles.helpfulnessText,
-                        intervention.helpful ? styles.helpfulText : styles.notHelpfulText
-                      ]}>
-                        {intervention.helpful ? 'Helpful' : 'Not helpful'}
-                      </Text>
-                    </View>
-                  )}
+                  <View style={styles.interventionDetails}>
+                    <Text style={styles.interventionStatus}>
+                      Status: {period.status}
+                    </Text>
+                    <Text style={styles.interventionProgress}>
+                      Progress: {period.completion_percentage}%
+                    </Text>
+                    <Text style={styles.interventionDate}>
+                      Started: {new Date(period.start_date).toLocaleDateString()}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>
           ) : (
             <Text style={styles.emptyText}>No interventions tried yet</Text>
-          )}
-          {profileData.interventions?.additional && (
-            <Text style={styles.additionalText}>
-              Additional: {profileData.interventions.additional}
-            </Text>
           )}
         </View>
 
@@ -351,15 +377,34 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   interventionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    marginBottom: 8,
   },
   interventionName: {
     fontSize: 16,
+    fontWeight: '600',
     color: '#1F2937',
-    flex: 1,
+    marginBottom: 4,
+  },
+  interventionDetails: {
+    marginTop: 4,
+  },
+  interventionStatus: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  interventionProgress: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  interventionDate: {
+    fontSize: 14,
+    color: '#6B7280',
   },
   helpfulnessTag: {
     paddingHorizontal: 8,
