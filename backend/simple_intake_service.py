@@ -30,7 +30,7 @@ class SimpleIntakeService:
     def process_intake_with_data_collection(
         self, 
         user_input: UserInput, 
-        user_id: Optional[str] = None,
+        user_id: str,
         recommendation_data: Optional[Dict] = None
     ) -> Dict:
         """
@@ -38,20 +38,16 @@ class SimpleIntakeService:
         
         Args:
             user_input: Structured user input with habits they've tried
-            user_id: Optional user ID (if None, creates anonymous user)
+            user_id: Required authenticated user ID
             
         Returns:
             Dictionary with recommendation and data collection status
         """
         
-        # Create user if not provided
-        print(f"🔍 DEBUG: user_id = {user_id} (type: {type(user_id)})")
         if not user_id:
-            print(f"⚠️ No user_id provided, creating anonymous user")
-            user_id = self._create_anonymous_user(user_input)
-            print(f"🔍 DEBUG: After _create_anonymous_user, user_id = {user_id}")
-        else:
-            print(f"✅ Using provided user_id: {user_id}")
+            raise ValueError("user_id is required - all users must be authenticated")
+            
+        print(f"🔍 DEBUG: Processing intake for authenticated user: {user_id}")
         
         # Create intake record - store all data in JSONB format
         intake_data = {
@@ -89,7 +85,7 @@ class SimpleIntakeService:
                     'cycle_length': user_input.lastPeriod.cycleLength if user_input.lastPeriod else None
                 },
                 'consent': user_input.consent,
-                'anonymous': user_input.anonymous
+                'anonymous': False  # All users are authenticated
             }
         }
         
@@ -129,42 +125,6 @@ class SimpleIntakeService:
             "message": "User data collected successfully"
         }
     
-    def _create_anonymous_user(self, user_input: UserInput) -> str:
-        """Create an anonymous user for data collection"""
-        
-        # For anonymous users, we'll create a temporary profile
-        # We need to work around the foreign key constraint to profiles table
-        try:
-            # Generate a unique user ID for this anonymous session
-            import uuid
-            anonymous_user_id = str(uuid.uuid4())
-            
-            # Create a temporary profile for anonymous user
-            # We'll use the service client to bypass RLS and create the profile
-            profile_data = {
-                'user_id': anonymous_user_id,
-                'date_of_birth': user_input.profile.dateOfBirth,
-                'dietary_preferences': user_input.dietaryPreferences.selected if user_input.dietaryPreferences else [],
-                'cycle_length': user_input.lastPeriod.cycleLength if user_input.lastPeriod else None,
-                'consent': True,
-                'anonymous': True
-            }
-            
-            # Try to create profile with service client (bypasses RLS)
-            profile_result = self.service_client.table('profiles').insert(profile_data).execute()
-            if profile_result.data:
-                print(f"✅ Created temporary profile for anonymous user: {anonymous_user_id}")
-                return anonymous_user_id
-            else:
-                raise Exception("Failed to create temporary profile")
-                    
-        except Exception as e:
-            print(f"❌ Error creating anonymous user: {e}")
-            # For now, use a hardcoded anonymous user ID that exists in profiles
-            # This is a temporary workaround until we can fix the database schema
-            fallback_id = '6ec2305f-0c72-4fea-9f61-f67e5b12e012'  # Existing user in profiles
-            print(f"⚠️ Using fallback anonymous user ID: {fallback_id}")
-            return fallback_id
     
     def _process_previous_interventions(self, user_id: str, intake_id: str, interventions: List) -> None:
         """Process interventions the user has already tried"""

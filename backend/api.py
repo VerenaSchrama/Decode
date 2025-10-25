@@ -288,7 +288,7 @@ async def recommend_intervention(user_input: UserInput, authorization: str = Hea
             from simple_intake_service import simple_intake_service
             from auth_service import AuthService
             
-            # Extract user ID from authentication token if provided
+            # Extract user ID from authentication token (required)
             user_id = None
             if authorization and authorization.startswith("Bearer "):
                 try:
@@ -300,13 +300,17 @@ async def recommend_intervention(user_input: UserInput, authorization: str = Hea
                         user_id = user_info["user"]["id"]
                         print(f"✅ Authenticated user ID: {user_id}")
                     else:
-                        print("⚠️  Token verification failed, using anonymous user")
+                        raise HTTPException(status_code=401, detail="Invalid authentication token")
                 except Exception as e:
-                    print(f"⚠️  Token verification error: {e}, using anonymous user")
+                    if isinstance(e, HTTPException):
+                        raise e
+                    raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+            else:
+                raise HTTPException(status_code=401, detail="Authorization header with Bearer token required")
             
             data_collection_result = simple_intake_service.process_intake_with_data_collection(
                 user_input, 
-                user_id=user_id,  # Use authenticated user ID or None for anonymous
+                user_id=user_id,  # Required authenticated user ID
                 recommendation_data=result
             )
             result["data_collection"] = data_collection_result
