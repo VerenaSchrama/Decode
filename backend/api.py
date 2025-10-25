@@ -1534,7 +1534,8 @@ async def start_intervention_period(
 ):
     """Start tracking a new intervention period"""
     try:
-        from intervention_period_service import intervention_period_service
+        from intervention_period_service import InterventionPeriodService
+        intervention_period_service = InterventionPeriodService()
         from auth_service import AuthService
         
         # Extract user ID from authentication token
