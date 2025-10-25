@@ -55,7 +55,7 @@ class SimpleIntakeService:
         
         # Create intake record - store all data in JSONB format
         intake_data = {
-            'user_uuid': user_id,  # Use user_uuid instead of user_id
+            'user_id': user_id,  # Use user_id to match database schema
             'intake_data': {
                 'profile': {
                     'name': user_input.profile.name,
@@ -76,13 +76,8 @@ class SimpleIntakeService:
                     'additional': user_input.interventions.additional if user_input.interventions else None
                 },
                 'habits': {
-                    'selected': [
-                        {
-                            'habit': item.habit,
-                            'success': item.success
-                        } for item in user_input.habits.selected
-                    ] if user_input.habits and user_input.habits.selected else [],
-                    'additional': user_input.habits.additional if user_input.habits else None
+                    'selected': [],
+                    'additional': None
                 },
                 'dietary_preferences': {
                     'selected': user_input.dietaryPreferences.selected if user_input.dietaryPreferences else [],
@@ -140,27 +135,38 @@ class SimpleIntakeService:
         # For authenticated users, we should use their actual user ID
         # For anonymous users, we'll create a temporary user record
         try:
-            # Try to create a user in profiles table
-            # Note: profiles table requires user_id (FK to auth.users.id)
-            # For anonymous users, we need to create an auth user first
-            # This is a simplified approach - in production, you'd want proper auth flow
-            user_data = {
-                'date_of_birth': user_input.profile.dateOfBirth,
-                'dietary_preferences': user_input.profile.dietaryPreferences or [],
-                'cycle_length': user_input.profile.cycleLength,
-                'consent': True,
-                'anonymous': True
-            }
+            # Check if demo user exists in profiles table
+            demo_user_id = '51ddb9cb-a675-4111-968b-49ad154bac24'  # Real user UUID from profiles table
             
-            # For now, return a demo user ID since we can't create auth users without proper auth flow
-            demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
-            print(f"✅ Using demo user for anonymous intake: {demo_user_id}")
-            return demo_user_id
+            # Verify the demo user exists in profiles table
+            result = self.service_client.table('profiles').select('user_id').eq('user_id', demo_user_id).execute()
+            
+            if result.data and len(result.data) > 0:
+                print(f"✅ Using existing demo user for anonymous intake: {demo_user_id}")
+                return demo_user_id
+            else:
+                print(f"⚠️ Demo user not found in profiles table, creating temporary profile")
+                # Create a temporary profile for anonymous user
+                profile_data = {
+                    'user_id': demo_user_id,
+                    'date_of_birth': user_input.profile.dateOfBirth,
+                    'dietary_preferences': user_input.dietaryPreferences.selected if user_input.dietaryPreferences else [],
+                    'cycle_length': user_input.lastPeriod.cycleLength if user_input.lastPeriod else None,
+                    'consent': True,
+                    'anonymous': True
+                }
                 
+                profile_result = self.service_client.table('profiles').insert(profile_data).execute()
+                if profile_result.data:
+                    print(f"✅ Created temporary profile for anonymous user: {demo_user_id}")
+                    return demo_user_id
+                else:
+                    raise Exception("Failed to create temporary profile")
+                    
         except Exception as e:
-            print(f"⚠️ Failed to create anonymous user: {e}")
-            # Fallback to demo user UUID
-            return "117e24ea-3562-45f2-9256-f1b032d0d86b"
+            print(f"❌ Error creating anonymous user: {e}")
+            # Fallback to demo user ID even if profile creation fails
+            return demo_user_id
     
     def _process_previous_interventions(self, user_id: str, intake_id: str, interventions: List) -> None:
         """Process interventions the user has already tried"""
