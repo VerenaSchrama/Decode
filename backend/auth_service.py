@@ -18,7 +18,7 @@ class UserRegistration(BaseModel):
     name: str
     age: Optional[int] = None
     date_of_birth: Optional[str] = None
-    anonymous: bool = False
+    # anonymous field removed - all users are authenticated
     
     @field_validator('email')
     @classmethod
@@ -59,7 +59,7 @@ class UserProfile(BaseModel):
     age: Optional[int] = None
     date_of_birth: Optional[str] = None
     current_strategy: Optional[str] = None
-    anonymous: bool = False
+    # anonymous field removed - all users are authenticated
 
 class AuthService:
     """Authentication service using Supabase Auth with service role"""
@@ -98,7 +98,7 @@ class AuthService:
                         "name": user_data.name,
                         "age": user_data.age,
                         "date_of_birth": user_data.date_of_birth,
-                        "anonymous": user_data.anonymous
+                        # anonymous field removed - all users are authenticated
                     }
                 }
             })
@@ -116,7 +116,7 @@ class AuthService:
                 "dietary_preferences": user_data.dietary_preferences if hasattr(user_data, 'dietary_preferences') else [],
                 "cycle_length": user_data.cycle_length if hasattr(user_data, 'cycle_length') else None,
                 "consent": True,
-                "anonymous": user_data.anonymous
+                # anonymous field removed - all users are authenticated
             }
             
             if self.service_client:
@@ -135,7 +135,7 @@ class AuthService:
                     "name": user_data.name,
                     "age": user_data.age,
                     "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
-                    "anonymous": user_data.anonymous
+                    # anonymous field removed - all users are authenticated
                 },
                 "session": {
                     "access_token": auth_response.session.access_token,
@@ -175,7 +175,7 @@ class AuthService:
                         "name": user_data.name,
                         "age": user_data.age,
                         "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
-                        "anonymous": user_data.anonymous
+                        # anonymous field removed - all users are authenticated
                     },
                     "session": None,  # No session until email is confirmed
                     "email_confirmation_required": True,
@@ -235,7 +235,7 @@ class AuthService:
                     "name": profile.get('name'),
                     "age": profile.get('age'),
                     "date_of_birth": profile.get('date_of_birth'),
-                    "anonymous": profile.get('anonymous', False)
+                    # anonymous field removed - all users are authenticated
                 },
                 "session": {
                     "access_token": auth_response.session.access_token,
@@ -326,7 +326,7 @@ class AuthService:
                     "age": profile.get('age'),
                     "date_of_birth": profile.get('date_of_birth'),
                     "current_strategy": profile.get('current_strategy'),
-                    "anonymous": profile.get('anonymous', False),
+                    # anonymous field removed - all users are authenticated,
                     "created_at": profile.get('created_at'),
                     "updated_at": profile.get('updated_at')
                 }
@@ -357,7 +357,7 @@ class AuthService:
                 "age": profile_data.age,
                 "date_of_birth": profile_data.date_of_birth,
                 "current_strategy": profile_data.current_strategy,
-                "anonymous": profile_data.anonymous
+                # anonymous field removed - all users are authenticated
             }
             
             if self.service_client:
