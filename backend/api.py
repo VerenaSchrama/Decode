@@ -300,13 +300,13 @@ async def recommend_intervention(user_input: UserInput, authorization: str = Hea
             access_token = authorization.split(" ")[1]
             user_info = await auth_service.verify_token(access_token)
             
-            if not user_info or not user_info.get("user"):
+            if not user_info or not user_info.get("success"):
                 raise HTTPException(
                     status_code=401,
                     detail="Invalid authentication token"
                 )
             
-            user_id = user_info["user"]["id"]
+            user_id = user_info["user_id"]
             print(f"✅ Authenticated user: {user_id}")
             
             # Process intake with data collection using authenticated user
