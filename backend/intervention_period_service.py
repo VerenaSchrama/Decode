@@ -52,7 +52,7 @@ class InterventionPeriodService:
         # Create intervention period record
         period_data = {
             "id": str(uuid.uuid4()),
-            "user_uuid": user_uuid,
+            "user_id": user_uuid,  # This matches the actual column name in the table
             "intake_id": intake_id,
             "intervention_name": intervention_name,
             "intervention_id": intervention_id,
@@ -165,7 +165,7 @@ class InterventionPeriodService:
         """Get all intervention periods for a user"""
         
         try:
-            result = self.supabase.client.table('intervention_periods').select('*').eq('user_uuid', user_uuid).order('created_at', desc=True).execute()
+            result = self.supabase.client.table('intervention_periods').select('*').eq('user_id', user_uuid).order('created_at', desc=True).execute()
             
             return {
                 "success": True,
@@ -185,7 +185,7 @@ class InterventionPeriodService:
         """Get the currently active intervention period for a user"""
         
         try:
-            result = self.supabase.client.table('intervention_periods').select('*').eq('user_uuid', user_uuid).eq('status', 'active').order('created_at', desc=True).limit(1).execute()
+            result = self.supabase.client.table('intervention_periods').select('*').eq('user_id', user_uuid).eq('status', 'active').order('created_at', desc=True).limit(1).execute()
             
             if result.data:
                 return {
