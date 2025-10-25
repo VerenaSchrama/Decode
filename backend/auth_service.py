@@ -454,5 +454,44 @@ class AuthService:
                 "message": f"Failed to send password reset email: {str(e)}"
             }
 
+    async def create_temporary_profile(self, profile_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a temporary profile for intake completion
+        This bypasses normal authentication for intake-only users
+        
+        Args:
+            profile_data: Profile data including user_id, name, age, etc.
+            
+        Returns:
+            Success status and profile information
+        """
+        try:
+            if not self.service_client:
+                return {
+                    "success": False,
+                    "error": "Service client not available for temporary profile creation"
+                }
+            
+            # Create temporary profile using service client to bypass RLS
+            profile_result = self.service_client.table('profiles').insert(profile_data).execute()
+            
+            if profile_result.data:
+                return {
+                    "success": True,
+                    "profile": profile_result.data[0],
+                    "message": "Temporary profile created successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to create temporary profile"
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error creating temporary profile: {str(e)}"
+            }
+
 # Create global auth service instance
 auth_service = AuthService()
