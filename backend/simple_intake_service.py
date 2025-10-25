@@ -136,7 +136,7 @@ class SimpleIntakeService:
         # For anonymous users, we'll create a temporary user record
         try:
             # Check if demo user exists in profiles table
-            demo_user_id = '51ddb9cb-a675-4111-968b-49ad154bac24'  # Real user UUID from profiles table
+            demo_user_id = '0046f1ba-76c9-4ebc-aa6e-eb29239e338f'  # Real user UUID from profiles table
             
             # Verify the demo user exists in profiles table
             result = self.service_client.table('profiles').select('user_id').eq('user_id', demo_user_id).execute()
