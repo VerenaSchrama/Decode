@@ -16,12 +16,12 @@ interface StoryIntakeScreenProps {
 }
 
 export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [currentStep, setCurrentStep] = useState(2); // Start at step 2 (LastPeriodStep) instead of 0 (NameStep) and 1 (DateOfBirthStep)
   const [formData, setFormData] = useState<StoryIntakeData>({
     profile: { 
       name: user?.name || '', // Pre-populate with name from authenticated user
-      dateOfBirth: '' // Will be collected during intake
+      age: 25 // Default age, will be updated during intake
     },
     lastPeriod: { date: '', hasPeriod: true, cycleLength: undefined },
     symptoms: { selected: [], additional: '' },
@@ -48,12 +48,20 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
 
   const handleComplete = async (data: StoryIntakeData) => {
     try {
+      // Check if user is authenticated
+      if (!session?.access_token) {
+        throw new Error('User not authenticated. Please log in to get recommendations.');
+      }
+      
+      // Debug: Log the data being sent
+      console.log('🔍 DEBUG: Sending intake data:', JSON.stringify(data, null, 2));
+      
       // User is already authenticated, so we can call the /recommend endpoint directly
       const response = await fetch('https://api.decode-app.nl/recommend', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.access_token}`, // Use authenticated user's token
+          'Authorization': `Bearer ${session?.access_token}`, // Use authenticated user's token
         },
         body: JSON.stringify(data),
       });

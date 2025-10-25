@@ -9,6 +9,7 @@ import HabitSelectionScreen from '../screens/HabitSelectionScreen';
 import MainAppScreen from '../screens/MainAppScreen';
 import { interventionPeriodService } from '../services/interventionPeriodService';
 import { useAuth } from '../contexts/AuthContext';
+import { CyclePhaseService } from '../services/cyclePhaseService';
 
 export type AppScreen = 'test' | 'story-intake' | 'thank-you' | 'recommendations' | 'habit-selection' | 'main-app';
 
@@ -88,15 +89,26 @@ export default function AppNavigator({
     const interventionHabits = intervention.habits?.map((habit: any) => habit.description) || [];
     console.log('Intervention habits:', interventionHabits);
     
+    // Calculate dynamic cycle phase
+    let cyclePhase = 'follicular'; // default fallback
+    if (intakeData?.lastPeriod?.date && intakeData?.lastPeriod?.cycleLength) {
+      const cyclePhaseService = CyclePhaseService.getInstance();
+      const phaseInfo = cyclePhaseService.calculateCyclePhase(
+        intakeData.lastPeriod.date,
+        intakeData.lastPeriod.cycleLength
+      );
+      cyclePhase = phaseInfo.phase;
+    }
+    
     // Start tracking intervention period
     try {
       const startRequest = {
-        intake_id: intakeData?.intake_id || intakeData?.id || 'temp-intake-id',
+        intake_id: intakeData?.intake_id || 'temp-intake-id',
         intervention_name: intervention.name,
         selected_habits: interventionHabits,
         intervention_id: intervention.id,
         planned_duration_days: periodData.durationDays,
-        cycle_phase: intakeData?.lastPeriod?.cyclePhase || 'follicular'
+        cycle_phase: cyclePhase
       };
       
       const result = await interventionPeriodService.startInterventionPeriod(

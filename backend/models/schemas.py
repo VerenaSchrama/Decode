@@ -18,13 +18,11 @@ class UserCreate(BaseModel):
     name: Optional[str] = None
     age: int = Field(..., ge=13, le=120)
     email: Optional[str] = None
-    anonymous: bool = False
 
 class UserResponse(BaseSchema):
     name: Optional[str] = None
     age: int
     email: Optional[str] = None
-    anonymous: bool
 
 class IntakeCreate(BaseModel):
     user_id: str

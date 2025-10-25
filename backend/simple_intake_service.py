@@ -55,8 +55,7 @@ class SimpleIntakeService:
             'intake_data': {
                 'profile': {
                     'name': user_input.profile.name,
-                    'age': user_input.profile.age,
-                    'date_of_birth': user_input.profile.dateOfBirth
+                    'age': user_input.profile.age
                 },
                 'symptoms': {
                     'selected': user_input.symptoms.selected,
@@ -85,7 +84,6 @@ class SimpleIntakeService:
                     'cycle_length': user_input.lastPeriod.cycleLength if user_input.lastPeriod else None
                 },
                 'consent': user_input.consent,
-                'anonymous': False  # All users are authenticated
             }
         }
         
@@ -100,7 +98,6 @@ class SimpleIntakeService:
         print(f"   - Dietary Preferences: {intake_data['intake_data']['dietary_preferences']}")
         print(f"   - Last Period: {intake_data['intake_data']['last_period']}")
         print(f"   - Consent: {intake_data['intake_data']['consent']}")
-        print(f"   - Anonymous: {intake_data['intake_data']['anonymous']}")
         
         intake_result = self.service_client.table('intakes').insert(intake_data).execute()
         print(f"🔍 DEBUG: Intake insert result: {intake_result}")

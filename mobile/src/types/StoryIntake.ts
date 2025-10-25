@@ -1,7 +1,7 @@
 // TypeScript types for Story Intake form
 export interface Profile {
   name: string;
-  dateOfBirth: string; // Changed from age to date of birth
+  age: number; // Changed back to age
 }
 
 export interface Symptoms {

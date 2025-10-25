@@ -23,26 +23,15 @@ export const DateOfBirthStep: React.FC<DateOfBirthStepProps> = ({
   onNext,
   onBack,
 }) => {
-  const [selectedDate, setSelectedDate] = useState(data.profile.dateOfBirth || '');
+  const [selectedAge, setSelectedAge] = useState(data.profile.age || 25);
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
-
-  const [selectedYear, setSelectedYear] = useState(1990);
-  const [selectedMonth, setSelectedMonth] = useState(0);
-  const [selectedDay, setSelectedDay] = useState(1);
+  const ages = Array.from({ length: 87 }, (_, i) => i + 13); // Ages 13-99
 
   const handleNext = () => {
-    const dateOfBirth = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
     onUpdate({
       profile: {
         ...data.profile,
-        dateOfBirth,
+        age: selectedAge,
       },
     });
     onNext();
@@ -69,81 +58,31 @@ export const DateOfBirthStep: React.FC<DateOfBirthStepProps> = ({
 
       {/* Content */}
       <View style={styles.content}>
-        <Text style={styles.title}>When were you born?</Text>
+        <Text style={styles.title}>How old are you?</Text>
         <Text style={styles.subtitle}>This helps us provide age-appropriate recommendations</Text>
 
-        <View style={styles.datePickerContainer}>
-          {/* Month Picker */}
-          <View style={styles.pickerColumn}>
-            <Text style={styles.pickerLabel}>Month</Text>
-            <ScrollView style={styles.picker} showsVerticalScrollIndicator={false}>
-              {months.map((month, index) => (
-                <TouchableOpacity
-                  key={index}
+        <View style={styles.agePickerContainer}>
+          <ScrollView style={styles.agePicker} showsVerticalScrollIndicator={false}>
+            {ages.map((age) => (
+              <TouchableOpacity
+                key={age}
+                style={[
+                  styles.ageOption,
+                  selectedAge === age && styles.ageOptionSelected,
+                ]}
+                onPress={() => setSelectedAge(age)}
+              >
+                <Text
                   style={[
-                    styles.pickerItem,
-                    selectedMonth === index && styles.pickerItemSelected
+                    styles.ageOptionText,
+                    selectedAge === age && styles.ageOptionTextSelected,
                   ]}
-                  onPress={() => setSelectedMonth(index)}
                 >
-                  <Text style={[
-                    styles.pickerItemText,
-                    selectedMonth === index && styles.pickerItemTextSelected
-                  ]}>
-                    {month}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Day Picker */}
-          <View style={styles.pickerColumn}>
-            <Text style={styles.pickerLabel}>Day</Text>
-            <ScrollView style={styles.picker} showsVerticalScrollIndicator={false}>
-              {days.map((day) => (
-                <TouchableOpacity
-                  key={day}
-                  style={[
-                    styles.pickerItem,
-                    selectedDay === day && styles.pickerItemSelected
-                  ]}
-                  onPress={() => setSelectedDay(day)}
-                >
-                  <Text style={[
-                    styles.pickerItemText,
-                    selectedDay === day && styles.pickerItemTextSelected
-                  ]}>
-                    {day}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Year Picker */}
-          <View style={styles.pickerColumn}>
-            <Text style={styles.pickerLabel}>Year</Text>
-            <ScrollView style={styles.picker} showsVerticalScrollIndicator={false}>
-              {years.map((year) => (
-                <TouchableOpacity
-                  key={year}
-                  style={[
-                    styles.pickerItem,
-                    selectedYear === year && styles.pickerItemSelected
-                  ]}
-                  onPress={() => setSelectedYear(year)}
-                >
-                  <Text style={[
-                    styles.pickerItemText,
-                    selectedYear === year && styles.pickerItemTextSelected
-                  ]}>
-                    {year}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+                  {age} years old
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </View>
 
@@ -209,41 +148,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 40,
   },
-  datePickerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    height: 200,
+  agePickerContainer: {
+    height: 300,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
   },
-  pickerColumn: {
-    flex: 1,
-    marginHorizontal: 8,
-  },
-  pickerLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  picker: {
+  agePicker: {
     flex: 1,
   },
-  pickerItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+  ageOption: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderRadius: 8,
     marginVertical: 2,
+    backgroundColor: '#FFFFFF',
   },
-  pickerItemSelected: {
-    backgroundColor: '#FFE4D6',
+  ageOptionSelected: {
+    backgroundColor: colors.primary,
   },
-  pickerItemText: {
-    fontSize: 16,
-    color: '#666',
+  ageOptionText: {
+    fontSize: 18,
+    color: '#333',
     textAlign: 'center',
   },
-  pickerItemTextSelected: {
-    color: colors.primary,
+  ageOptionTextSelected: {
+    color: '#FFFFFF',
     fontWeight: '600',
   },
   footer: {

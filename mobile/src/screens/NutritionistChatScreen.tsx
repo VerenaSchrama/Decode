@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../constants/colors';
 import { apiService, ChatMessage } from '../services/apiService';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NutritionistChatScreenProps {
   intakeData?: any;
@@ -37,6 +38,7 @@ export default function NutritionistChatScreen({
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   // Use authenticated user ID
   const userId = user?.id;

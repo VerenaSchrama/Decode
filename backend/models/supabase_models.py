@@ -309,7 +309,6 @@ def convert_user_input_to_supabase(user_input):
         "habits": user_input.habits.dict() if hasattr(user_input, 'habits') else {},
         "dietary_preferences": user_input.dietaryPreferences.dict() if hasattr(user_input, 'dietaryPreferences') else {},
         "consent": getattr(user_input, 'consent', False),
-        "anonymous": getattr(user_input, 'anonymous', False)
     }
 
 def convert_habits_to_supabase(habits):

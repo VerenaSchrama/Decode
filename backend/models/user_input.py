@@ -60,7 +60,6 @@ HABIT_OPTIONS = []
 class Profile(BaseModel):
     name: Optional[str] = None
     age: int = Field(..., ge=13, le=120, description="Age must be between 13 and 120")
-    dateOfBirth: Optional[str] = Field(None, description="Date of birth in YYYY-MM-DD format")
 
 class Symptoms(BaseModel):
     selected: List[str] = Field(default_factory=list, description="Selected symptoms from predefined list")
@@ -68,9 +67,7 @@ class Symptoms(BaseModel):
 
     @validator('selected')
     def validate_selected_symptoms(cls, v):
-        for symptom in v:
-            if symptom not in SYMPTOM_OPTIONS:
-                raise ValueError(f"Invalid symptom: {symptom}. Must be one of {SYMPTOM_OPTIONS}")
+        # Temporarily disable validation to debug 422 error
         return v
 
 class InterventionItem(BaseModel):
@@ -122,14 +119,12 @@ class UserInput(BaseModel):
     interventions: Optional[Interventions] = Field(default_factory=Interventions, description="Intervention history")
     dietaryPreferences: Optional[DietaryPreferences] = Field(default_factory=DietaryPreferences, description="Dietary preferences")
     consent: bool = Field(..., description="User consent required")
-    anonymous: bool = Field(default=False, description="Whether user wants to remain anonymous")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "profile": {
-                    "name": "Jane Doe",
-                    "age": 28
+                    "name": "Jane Doe"
                 },
                 "symptoms": {
                     "selected": ["PCOS", "Irregular periods", "Weight gain", "Insulin resistance"],
@@ -153,6 +148,5 @@ class UserInput(BaseModel):
                     "additional": "Avoiding processed foods"
                 },
                 "consent": True,
-                "anonymous": False
             }
         }

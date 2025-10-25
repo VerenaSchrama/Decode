@@ -18,7 +18,6 @@ class User(BaseEntity):
     name: Optional[str] = None
     age: int = Field(..., ge=13, le=120, description="Age must be between 13 and 120")
     email: Optional[str] = None
-    anonymous: bool = Field(default=False, description="Whether user wants to remain anonymous")
     
     class Config:
         json_schema_extra = {
@@ -27,7 +26,6 @@ class User(BaseEntity):
                 "name": "Jane Doe",
                 "age": 28,
                 "email": "jane@example.com",
-                "anonymous": False,
                 "created_at": "2024-01-15T10:30:00Z",
                 "updated_at": "2024-01-15T10:30:00Z"
             }
