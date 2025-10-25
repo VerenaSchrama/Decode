@@ -191,7 +191,7 @@ class SimpleIntakeService:
             if intervention_id:
                 # Store as custom intervention with helpfulness tracking
                 custom_intervention_data = {
-                    'user_uuid': user_id,  # Use user_uuid instead of user_id
+                    'user_id': user_id,  # Use user_id to match database schema
                     'intake_id': intake_id,  # Link to the intake
                     'intervention_name': intervention_name,
                     'description': f"Previously tried intervention: {intervention_name}",

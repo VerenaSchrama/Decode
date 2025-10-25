@@ -12,7 +12,7 @@ import uuid
 class InterventionPeriod(BaseModel):
     """Model for tracking intervention periods"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_uuid: str = Field(..., description="User UUID")
+    user_id: str = Field(..., description="User ID from profiles table")
     intake_id: str = Field(..., description="Reference to intake that generated this intervention")
     intervention_name: str = Field(..., description="Name of the intervention")
     intervention_id: Optional[str] = Field(None, description="ID from InterventionsBASE table")
@@ -36,7 +36,7 @@ class InterventionPeriodService:
     
     def start_intervention_period(
         self, 
-        user_uuid: str, 
+        user_id: str, 
         intake_id: str, 
         intervention_name: str,
         selected_habits: List[str],
@@ -52,7 +52,7 @@ class InterventionPeriodService:
         # Create intervention period record
         period_data = {
             "id": str(uuid.uuid4()),
-            "user_id": user_uuid,  # This matches the actual column name in the table
+            "user_id": user_id,  # This matches the actual column name in the table
             "intake_id": intake_id,
             "intervention_name": intervention_name,
             "intervention_id": intervention_id,
@@ -73,7 +73,7 @@ class InterventionPeriodService:
             result = self.supabase.client.table('intervention_periods').insert(period_data).execute()
             
             if result.data:
-                print(f"✅ Started intervention period: {intervention_name} for user {user_uuid}")
+                print(f"✅ Started intervention period: {intervention_name} for user {user_id}")
                 return {
                     "success": True,
                     "period_id": result.data[0]['id'],
@@ -161,11 +161,11 @@ class InterventionPeriodService:
                 "error": str(e)
             }
     
-    def get_user_intervention_periods(self, user_uuid: str) -> Dict[str, Any]:
+    def get_user_intervention_periods(self, user_id: str) -> Dict[str, Any]:
         """Get all intervention periods for a user"""
         
         try:
-            result = self.supabase.client.table('intervention_periods').select('*').eq('user_id', user_uuid).order('created_at', desc=True).execute()
+            result = self.supabase.client.table('intervention_periods').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
             
             return {
                 "success": True,
@@ -181,11 +181,11 @@ class InterventionPeriodService:
                 "periods": []
             }
     
-    def get_active_intervention_period(self, user_uuid: str) -> Dict[str, Any]:
+    def get_active_intervention_period(self, user_id: str) -> Dict[str, Any]:
         """Get the currently active intervention period for a user"""
         
         try:
-            result = self.supabase.client.table('intervention_periods').select('*').eq('user_id', user_uuid).eq('status', 'active').order('created_at', desc=True).limit(1).execute()
+            result = self.supabase.client.table('intervention_periods').select('*').eq('user_id', user_id).eq('status', 'active').order('created_at', desc=True).limit(1).execute()
             
             if result.data:
                 return {

@@ -217,7 +217,7 @@ class SupabaseClient:
     
     def get_user_recommendations(self, user_id: str):
         """Get all recommendations for a user"""
-        return self.client.table('intakes').select('*').eq('user_uuid', user_id).execute()
+        return self.client.table('intakes').select('*').eq('user_id', user_id).execute()
     
     # Custom intervention operations (unchanged)
     def create_custom_intervention(self, intervention_data: Dict[str, Any]):

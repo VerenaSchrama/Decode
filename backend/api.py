@@ -468,13 +468,13 @@ async def get_daily_progress_status(user_id: str, date: str):
         from models import supabase_client
         from datetime import datetime
         
-        # Map user_id to user_uuid
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'
+        # Map user_id to user_id (after migration)
+        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'
         
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            db_user_id = demo_user_id
         else:
-            db_user_uuid = user_id
+            db_user_id = user_id
         
         # For demo users, use a simple in-memory approach
         if user_id == 'demo-user-123':
@@ -485,7 +485,7 @@ async def get_daily_progress_status(user_id: str, date: str):
             # For authenticated users, use the normal approach
             result = supabase_client.client.table('daily_summaries')\
                 .select('id, entry_date, created_at')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .eq('entry_date', date)\
                 .execute()
             
@@ -496,7 +496,7 @@ async def get_daily_progress_status(user_id: str, date: str):
                 try:
                     habit_result = supabase_client.client.table('daily_habit_entries')\
                         .select('id, entry_date')\
-                        .eq('user_id', db_user_uuid)\
+                        .eq('user_id', db_user_id)\
                         .eq('entry_date', date)\
                         .execute()
                     
@@ -545,12 +545,12 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         entry_date = request.get('entry_date', datetime.now().strftime('%Y-%m-%d'))
         
         # Map user_id to user_uuid for database operations
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'
+        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'
         
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            db_user_id = demo_user_id
         else:
-            db_user_uuid = user_id
+            db_user_id = user_id
         
         # Check if user has already tracked progress for this date
         if user_id == 'demo-user-123':
@@ -565,7 +565,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             try:
                 existing_result = supabase_client.client.table('daily_summaries')\
                     .select('id, entry_date')\
-                    .eq('user_id', db_user_uuid)\
+                    .eq('user_id', db_user_id)\
                     .eq('entry_date', entry_date)\
                     .execute()
                 
@@ -604,8 +604,8 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'created_at': datetime.now().isoformat()
         }
         
-        # Use the db_user_uuid we already determined above
-        print(f"DEBUG: Using db_user_uuid: {db_user_uuid} for user_id: {user_id}")
+        # Use the db_user_id we already determined above
+        print(f"DEBUG: Using db_user_id: {db_user_id} for user_id: {user_id}")
         
         # NEW SCHEMA: Create individual entries for each habit
         entry_ids = []
@@ -627,14 +627,14 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 # Check if user_habit exists, if not create it
                 user_habit_result = supabase_client.client.table('user_habits')\
                     .select('id')\
-                    .eq('user_id', db_user_uuid)\
+                    .eq('user_id', db_user_id)\
                     .eq('habit_name', habit_name)\
                     .execute()
                 
                 if not user_habit_result.data:
                     # Create new user_habit
                     user_habit_data = {
-                        'user_id': db_user_uuid,
+                        'user_id': db_user_id,
                         'habit_name': habit_name,
                         'habit_description': f"Daily habit: {habit_name}",
                         'status': 'active'
@@ -658,7 +658,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 # Store demo user data in daily_habit_entries table for status checking
                 try:
                     daily_entry_data = {
-                        'user_id': db_user_uuid,
+                        'user_id': db_user_id,
                         'habit_id': habit_id,
                         'entry_date': entry_date,
                         'completed': habit.get('completed', False),
@@ -674,7 +674,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 # Also create a daily_summaries entry for demo users to enable status checking
                 try:
                     daily_summary_data = {
-                        'user_id': db_user_uuid,
+                        'user_id': db_user_id,
                         'entry_date': entry_date,
                         'completion_percentage': completion_percentage,
                         'mood': mood.get('mood') if mood else None,
@@ -691,7 +691,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             else:
                 # For authenticated users, use the normal daily_habit_entries table
                 daily_entry_data = {
-                    'user_id': db_user_uuid,
+                    'user_id': db_user_id,
                     'habit_id': habit_id,
                     'entry_date': entry_date,
                     'completed': habit.get('completed', False),
@@ -711,7 +711,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                             'mood': daily_entry_data['mood'],
                             'notes': daily_entry_data['notes'],
                             'updated_at': datetime.now().isoformat()
-                        }).eq('user_id', db_user_uuid).eq('habit_id', habit_id).eq('entry_date', entry_date).execute()
+                        }).eq('user_id', db_user_id).eq('habit_id', habit_id).eq('entry_date', entry_date).execute()
                         entry_ids.append(result.data[0]['id'] if result.data else str(uuid.uuid4()))
                     else:
                         raise e
@@ -751,14 +751,14 @@ async def get_daily_progress(user_id: str, days: int = 7):
         import hashlib
         
         # Map user_id to user_uuid (after migration)
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
         
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            db_user_id = demo_user_id
         else:
             # For authenticated users, use their actual UUID
             # Real users send their actual UUID as user_id
-            db_user_uuid = user_id
+            db_user_id = user_id
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -768,7 +768,7 @@ async def get_daily_progress(user_id: str, days: int = 7):
         try:
             result = supabase_client.client.table('daily_habit_entries')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -813,14 +813,14 @@ async def get_daily_summaries(user_id: str, days: int = 7):
         from datetime import datetime, timedelta
         
         # Map user_id to user_uuid (after migration)
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
         
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            db_user_id = demo_user_id
         else:
             # For authenticated users, use their actual UUID
             # Real users send their actual UUID as user_id
-            db_user_uuid = user_id
+            db_user_id = user_id
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -830,7 +830,7 @@ async def get_daily_summaries(user_id: str, days: int = 7):
         try:
             result = supabase_client.client.table('daily_summaries')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -874,20 +874,20 @@ async def get_daily_summary(user_id: str, date: str):
         from models import supabase_client
         
         # Map user_id to user_uuid (after migration)
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
         
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            db_user_id = demo_user_id
         else:
             # For authenticated users, use their actual UUID
             # Real users send their actual UUID as user_id
-            db_user_uuid = user_id
+            db_user_id = user_id
         
         # Query specific day's summary
         try:
             result = supabase_client.client.table('daily_summaries')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .eq('entry_date', date)\
                 .execute()
             
@@ -930,14 +930,14 @@ async def get_user_analytics(user_id: str, days: int = 30):
         from datetime import datetime, timedelta
         
         # Map user_id to user_uuid (after migration)
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
         
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            db_user_id = demo_user_id
         else:
             # For authenticated users, use their actual UUID
             # Real users send their actual UUID as user_id
-            db_user_uuid = user_id
+            db_user_id = user_id
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -947,7 +947,7 @@ async def get_user_analytics(user_id: str, days: int = 30):
         try:
             result = supabase_client.client.table('daily_summaries')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -1059,14 +1059,14 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
         from datetime import datetime, timedelta
         
         # Map user_id to user_uuid (after migration)
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
         
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            db_user_id = demo_user_id
         else:
             # For authenticated users, use their actual UUID
             # Real users send their actual UUID as user_id
-            db_user_uuid = user_id
+            db_user_id = user_id
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -1077,7 +1077,7 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             # First get daily summaries
             summaries_result = supabase_client.client.table('daily_summaries')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -1088,7 +1088,7 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             # Get individual habit entries for each day
             habit_entries_result = supabase_client.client.table('daily_habit_entries')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -1206,20 +1206,20 @@ async def get_habit_streak(user_id: str):
         import hashlib
         
         # Map user_id to user_uuid (after migration)
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
         
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            db_user_id = demo_user_id
         else:
             # For authenticated users, use their actual UUID
             # Real users send their actual UUID as user_id
-            db_user_uuid = user_id
+            db_user_id = user_id
         
         # Get recent daily summaries for streak calculation
         try:
             result = supabase_client.client.table('daily_summaries')\
                 .select('entry_date, completion_percentage')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .gte('entry_date', (datetime.now().date() - timedelta(days=30)).isoformat())\
                 .order('entry_date', desc=True)\
                 .execute()
@@ -1364,12 +1364,12 @@ Remember, I'm here to support your health journey with evidence-based recommenda
         
         # Generate a consistent UUID for the user_id (hash-based for demo purposes)
         import hashlib
-        user_uuid = str(uuid.UUID(hashlib.md5(request.user_id.encode()).hexdigest()[:32]))
+        user_id = str(uuid.UUID(hashlib.md5(request.user_id.encode()).hexdigest()[:32]))
         
         # Store user message
         user_message = {
             "id": message_id,
-            "user_id": user_uuid,
+            "user_id": user_id,
             "message": request.message,
             "is_user": True,
             "timestamp": user_timestamp,
@@ -1381,7 +1381,7 @@ Remember, I'm here to support your health journey with evidence-based recommenda
         ai_timestamp = datetime.now().isoformat()
         ai_message = {
             "id": ai_message_id,
-            "user_id": user_uuid,
+            "user_id": user_id,
             "message": response_message,
             "is_user": False,
             "timestamp": ai_timestamp,
@@ -1424,12 +1424,12 @@ async def get_chat_history(user_id: str, limit: int = 50):
         from models import supabase_client
         # Generate the same UUID for the user_id
         import hashlib
-        user_uuid = str(uuid.UUID(hashlib.md5(user_id.encode()).hexdigest()[:32]))
-        print(f"Looking for chat history for user_id: {user_id}, UUID: {user_uuid}")
+        user_id = str(uuid.UUID(hashlib.md5(user_id.encode()).hexdigest()[:32]))
+        print(f"Looking for chat history for user_id: {user_id}, UUID: {user_id}")
         
         result = supabase_client.client.table('chat_messages')\
             .select('*')\
-            .eq('user_id', user_uuid)\
+            .eq('user_id', user_id)\
             .order('timestamp', desc=False)\
             .limit(limit)\
             .execute()
@@ -1539,15 +1539,15 @@ async def start_intervention_period(
         from auth_service import AuthService
         
         # Extract user ID from authentication token
-        user_uuid = None
+        user_id = None
         if authorization and authorization.startswith("Bearer "):
             try:
                 access_token = authorization.split(" ")[1]
                 auth_service = AuthService()
                 user_info = await auth_service.verify_token(access_token)
                 if user_info and user_info.get("user"):
-                    user_uuid = user_info["user"]["id"]
-                    print(f"✅ Starting intervention for authenticated user: {user_uuid}")
+                    user_id = user_info["user"]["id"]
+                    print(f"✅ Starting intervention for authenticated user: {user_id}")
                 else:
                     print("⚠️ Token verification failed")
                     raise HTTPException(status_code=401, detail="Invalid authentication token")
@@ -1570,7 +1570,7 @@ async def start_intervention_period(
         
         # Start intervention period
         result = intervention_period_service.start_intervention_period(
-            user_uuid=user_uuid,
+            user_id=user_id,
             intake_id=intake_id,
             intervention_name=intervention_name,
             selected_habits=selected_habits,
@@ -1598,14 +1598,14 @@ async def get_active_intervention_period(authorization: str = Header(None)):
         from auth_service import AuthService
         
         # Extract user ID from authentication token
-        user_uuid = None
+        user_id = None
         if authorization and authorization.startswith("Bearer "):
             try:
                 access_token = authorization.split(" ")[1]
                 auth_service = AuthService()
                 user_info = await auth_service.verify_token(access_token)
                 if user_info and user_info.get("user"):
-                    user_uuid = user_info["user"]["id"]
+                    user_id = user_info["user"]["id"]
                 else:
                     raise HTTPException(status_code=401, detail="Invalid authentication token")
             except Exception as e:
@@ -1614,7 +1614,7 @@ async def get_active_intervention_period(authorization: str = Header(None)):
             raise HTTPException(status_code=401, detail="Authentication token required")
         
         # Get active intervention period
-        result = intervention_period_service.get_active_intervention_period(user_uuid)
+        result = intervention_period_service.get_active_intervention_period(user_id)
         
         if result["success"]:
             return result
@@ -1635,14 +1635,14 @@ async def get_intervention_periods_history(authorization: str = Header(None)):
         from auth_service import AuthService
         
         # Extract user ID from authentication token
-        user_uuid = None
+        user_id = None
         if authorization and authorization.startswith("Bearer "):
             try:
                 access_token = authorization.split(" ")[1]
                 auth_service = AuthService()
                 user_info = await auth_service.verify_token(access_token)
                 if user_info and user_info.get("user"):
-                    user_uuid = user_info["user"]["id"]
+                    user_id = user_info["user"]["id"]
                 else:
                     raise HTTPException(status_code=401, detail="Invalid authentication token")
             except Exception as e:
@@ -1651,7 +1651,7 @@ async def get_intervention_periods_history(authorization: str = Header(None)):
             raise HTTPException(status_code=401, detail="Authentication token required")
         
         # Get intervention periods history
-        result = intervention_period_service.get_user_intervention_periods(user_uuid)
+        result = intervention_period_service.get_user_intervention_periods(user_id)
         
         if result["success"]:
             return result
@@ -1851,14 +1851,14 @@ async def get_user_session_data(user_id: str):
         from datetime import datetime, timedelta
         
         # Map user_id to user_uuid (after migration)
-        demo_user_uuid = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
         
         if user_id == 'demo-user-123':
-            db_user_uuid = demo_user_uuid
+            db_user_id = demo_user_id
         else:
             # For authenticated users, use their actual UUID
             # Real users send their actual UUID as user_id
-            db_user_uuid = user_id
+            db_user_id = user_id
         
         session_data = {
             "user_id": user_id,
@@ -1873,7 +1873,7 @@ async def get_user_session_data(user_id: str):
         try:
             intake_result = supabase_client.client.table('intakes')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .order('created_at', desc=True)\
                 .limit(1)\
                 .execute()
@@ -1897,7 +1897,7 @@ async def get_user_session_data(user_id: str):
         try:
             period_result = supabase_client.client.table('intervention_periods')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .eq('status', 'active')\
                 .order('start_date', desc=True)\
                 .limit(1)\
@@ -1924,7 +1924,7 @@ async def get_user_session_data(user_id: str):
             
             progress_result = supabase_client.client.table('daily_habit_entries')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -1938,7 +1938,7 @@ async def get_user_session_data(user_id: str):
         try:
             periods_result = supabase_client.client.table('intervention_periods')\
                 .select('*')\
-                .eq('user_id', db_user_uuid)\
+                .eq('user_id', db_user_id)\
                 .order('start_date', desc=True)\
                 .execute()
             
