@@ -28,7 +28,6 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
     interventions: { selected: [], additional: '' },
     dietaryPreferences: { selected: [], additional: '' },
     consent: false,
-    anonymous: false, // All users are authenticated
   });
 
   const handleNext = () => {
@@ -47,8 +46,38 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
     setFormData({ ...formData, ...data });
   };
 
-  const handleComplete = (data: StoryIntakeData) => {
-    onComplete(data);
+  const handleComplete = async (data: StoryIntakeData) => {
+    try {
+      // User is already authenticated, so we can call the /recommend endpoint directly
+      const response = await fetch('https://api.decode-app.nl/recommend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.access_token}`, // Use authenticated user's token
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Add the intake_id to the data for tracking
+      const enhancedData = {
+        ...data,
+        intake_id: result.data_collection?.intake_id,
+        recommendations: result.interventions
+      };
+      
+      console.log('✅ Intake completed:', enhancedData);
+      onComplete(enhancedData);
+    } catch (error) {
+      console.error('❌ Error completing intake:', error);
+      // Still pass the data to parent even if API call fails
+      onComplete(data);
+    }
   };
 
   const renderStepComponent = () => {

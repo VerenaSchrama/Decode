@@ -243,114 +243,7 @@ async def review_custom_intervention(
             detail=f"Error reviewing custom intervention: {str(e)}"
         )
 
-@app.post("/complete-intake-and-authenticate")
-async def complete_intake_and_authenticate(user_input: UserInput):
-    """
-    Complete intake and authenticate user in one step
-    This endpoint handles new users who complete intake and need authentication
-    
-    Args:
-        user_input: Structured user input with profile, symptoms, interventions, habits, dietary preferences
-        
-    Returns:
-        Intervention recommendation with authentication token
-    """
-    if not RAG_AVAILABLE:
-        raise HTTPException(
-            status_code=503, 
-            detail="RAG pipeline not available. Please check server logs."
-        )
-    
-    # Validate that user has provided some input
-    has_symptoms = user_input.symptoms.selected or user_input.symptoms.additional
-    has_interventions = user_input.interventions.selected or user_input.interventions.additional
-    
-    if not has_symptoms and not has_interventions:
-        raise HTTPException(
-            status_code=400,
-            detail="Please provide symptoms or intervention preferences"
-        )
-    
-    if not user_input.consent:
-        raise HTTPException(
-            status_code=400,
-            detail="User consent is required to process your request"
-        )
-    
-    try:
-        # Process structured user input through RAG pipeline
-        result = process_structured_user_input(user_input)
-        
-        # Check if there's an error
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=result["error"])
-        
-        # Create a temporary authenticated user for this intake
-        try:
-            from simple_intake_service import simple_intake_service
-            from auth_service import AuthService
-            import uuid
-            
-            # Generate a temporary user ID for this intake session
-            temp_user_id = str(uuid.uuid4())
-            print(f"🔐 Creating temporary authenticated user: {temp_user_id}")
-            
-            # Create a temporary profile for this user
-            auth_service = AuthService()
-            
-            # Create a temporary user profile in the database
-            profile_data = {
-                "user_id": temp_user_id,
-                "name": user_input.profile.name,
-                "age": user_input.profile.age,
-                "date_of_birth": user_input.profile.dateOfBirth,
-                "dietary_preferences": user_input.dietaryPreferences.selected,
-                "cycle_length": user_input.lastPeriod.cycleLength,
-                "consent": user_input.consent
-            }
-            
-            # Store the profile (this will be linked to the intake)
-            profile_result = auth_service.create_temporary_profile(profile_data)
-            
-            if profile_result.get("success"):
-                print(f"✅ Temporary profile created: {temp_user_id}")
-                
-                # Process intake with the temporary user ID
-                data_collection_result = simple_intake_service.process_intake_with_data_collection(
-                    user_input, 
-                    user_id=temp_user_id,
-                    recommendation_data=result
-                )
-                result["data_collection"] = data_collection_result
-                result["temp_user_id"] = temp_user_id
-                result["authentication_token"] = f"temp_{temp_user_id}"  # Temporary token
-                print("✅ Intake completed with temporary authentication")
-            else:
-                raise Exception(f"Failed to create temporary profile: {profile_result.get('error')}")
-                
-        except Exception as e:
-            print(f"⚠️  Authentication setup failed: {e}")
-            result["data_collection"] = {"message": "Authentication setup failed", "error": str(e)}
-        
-        # Validate required fields for new multiple-intervention format
-        required_fields = ["intake_summary", "interventions"]
-        
-        for field in required_fields:
-            if field not in result:
-                raise HTTPException(
-                    status_code=500, 
-                    detail=f"Missing required field: {field}"
-                )
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
+# Removed /complete-intake-and-authenticate endpoint - all users must be authenticated
 
 @app.post("/recommend")
 async def recommend_intervention(user_input: UserInput, authorization: str = Header(None)):
@@ -1531,27 +1424,21 @@ async def start_intervention_period(
         intervention_period_service = InterventionPeriodService()
         from auth_service import AuthService
         
-        # Extract user ID from authentication token (regular or temporary)
+        # Extract user ID from authentication token (regular only)
         user_id = None
         if authorization and authorization.startswith("Bearer "):
             try:
                 access_token = authorization.split(" ")[1]
                 
-                # Check if this is a temporary token
-                if access_token.startswith("temp_"):
-                    # Extract user ID from temporary token
-                    user_id = access_token.replace("temp_", "")
-                    print(f"✅ Starting intervention for temporary user: {user_id}")
+                # Regular token verification only
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("user"):
+                    user_id = user_info["user"]["id"]
+                    print(f"✅ Starting intervention for authenticated user: {user_id}")
                 else:
-                    # Regular token verification
-                    auth_service = AuthService()
-                    user_info = await auth_service.verify_token(access_token)
-                    if user_info and user_info.get("user"):
-                        user_id = user_info["user"]["id"]
-                        print(f"✅ Starting intervention for authenticated user: {user_id}")
-                    else:
-                        print("⚠️ Token verification failed")
-                        raise HTTPException(status_code=401, detail="Invalid authentication token")
+                    print("⚠️ Token verification failed")
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
             except Exception as e:
                 print(f"❌ Token verification error: {e}")
                 raise HTTPException(status_code=401, detail="Authentication failed")

@@ -88,40 +88,41 @@ export default function AppNavigator({
     const interventionHabits = intervention.habits?.map((habit: any) => habit.description) || [];
     console.log('Intervention habits:', interventionHabits);
     
-    // Start tracking intervention period if user is authenticated
-    if (session?.access_token && intakeData) {
-      try {
-        const startRequest = {
-          intake_id: intakeData.intake_id || intakeData.id || 'temp-intake-id', // Use intake ID if available
-          intervention_name: intervention.name,
-          selected_habits: interventionHabits,
-          intervention_id: intervention.id,
-          planned_duration_days: periodData.durationDays,
-          cycle_phase: intakeData.lastPeriod?.cyclePhase || 'follicular'
-        };
-        
-        const result = await interventionPeriodService.startInterventionPeriod(
-          startRequest,
-          session.access_token
+    // Start tracking intervention period
+    try {
+      const startRequest = {
+        intake_id: intakeData?.intake_id || intakeData?.id || 'temp-intake-id',
+        intervention_name: intervention.name,
+        selected_habits: interventionHabits,
+        intervention_id: intervention.id,
+        planned_duration_days: periodData.durationDays,
+        cycle_phase: intakeData?.lastPeriod?.cyclePhase || 'follicular'
+      };
+      
+      const result = await interventionPeriodService.startInterventionPeriod(
+        startRequest,
+        session.access_token
+      );
+      
+      if (result.success) {
+        console.log('✅ Intervention period tracking started:', result.period_id);
+      } else {
+        console.error('❌ Failed to start intervention period tracking:', result.error);
+        Alert.alert(
+          'Tracking Error',
+          'Failed to start tracking your intervention. Please try again or contact support.',
+          [{ text: 'OK' }]
         );
-        
-        if (result.success) {
-          console.log('✅ Intervention period tracking started:', result.period_id);
-        } else {
-          console.error('❌ Failed to start intervention period tracking:', result.error);
-          // Show user-friendly error message
-          Alert.alert(
-            'Tracking Error',
-            'Failed to start tracking your intervention. Please try again or contact support.',
-            [{ text: 'OK' }]
-          );
-          return; // Don't continue to habit selection if tracking fails
-        }
-      } catch (error) {
-        console.error('❌ Error starting intervention period tracking:', error);
+        return;
       }
-    } else {
-      console.log('ℹ️ Skipping intervention period tracking - no session or intake data');
+    } catch (error) {
+      console.error('❌ Error starting intervention period tracking:', error);
+      Alert.alert(
+        'Tracking Error',
+        'Failed to start tracking your intervention. Please try again or contact support.',
+        [{ text: 'OK' }]
+      );
+      return;
     }
     
     // Pass the habits to the habit selection screen
