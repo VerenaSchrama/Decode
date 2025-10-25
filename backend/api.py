@@ -51,7 +51,8 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",  # Local development
     "http://localhost:8081",  # Expo development server
-    "https://decodev1.vercel.app",  # Replace with your actual Vercel URL
+    "https://decodev1.vercel.app",  # Vercel production URL
+    "https://decodev1-git-main-verenaschramas-projects.vercel.app",  # Vercel branch URL
     #"https://your-domain.com",  # Replace with your custom domain if you have one
 ]
 
