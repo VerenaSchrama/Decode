@@ -286,38 +286,40 @@ async def recommend_intervention(user_input: UserInput, authorization: str = Hea
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
         
-        # Collect user data in Supabase
+        # Verify authentication token is provided
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication token required"
+            )
+        
         try:
-            from simple_intake_service import simple_intake_service
+            # Verify the token and get user ID
             from auth_service import AuthService
+            auth_service = AuthService()
+            access_token = authorization.split(" ")[1]
+            user_info = await auth_service.verify_token(access_token)
             
-            # Extract user ID from authentication token (required)
-            user_id = None
-            if authorization and authorization.startswith("Bearer "):
-                try:
-                    access_token = authorization.split(" ")[1]
-                    auth_service = AuthService()
-                    # Verify token and get user info
-                    user_info = await auth_service.verify_token(access_token)
-                    if user_info and user_info.get("user"):
-                        user_id = user_info["user"]["id"]
-                        print(f"✅ Authenticated user ID: {user_id}")
-                    else:
-                        raise HTTPException(status_code=401, detail="Invalid authentication token")
-                except Exception as e:
-                    if isinstance(e, HTTPException):
-                        raise e
-                    raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
-            else:
-                raise HTTPException(status_code=401, detail="Authorization header with Bearer token required")
+            if not user_info or not user_info.get("user"):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid authentication token"
+                )
             
+            user_id = user_info["user"]["id"]
+            print(f"✅ Authenticated user: {user_id}")
+            
+            # Process intake with data collection using authenticated user
+            from simple_intake_service import simple_intake_service
             data_collection_result = simple_intake_service.process_intake_with_data_collection(
                 user_input, 
-                user_id=user_id,  # Required authenticated user ID
+                user_id=user_id,
                 recommendation_data=result
             )
             result["data_collection"] = data_collection_result
-            print("✅ Data collection completed successfully")
+            print("✅ Intake completed with authenticated user")
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"⚠️  Data collection failed: {e}")
             result["data_collection"] = {"message": "Data collection failed", "error": str(e)}

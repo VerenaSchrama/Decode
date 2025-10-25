@@ -127,6 +127,7 @@ class AuthService:
                 # Fallback to regular client (may fail due to RLS)
                 profile_result = self.client.table('profiles').upsert(profile_data).execute()
             
+            # Always return session - email confirmation is disabled
             return {
                 "success": True,
                 "user": {
@@ -135,7 +136,6 @@ class AuthService:
                     "name": user_data.name,
                     "age": user_data.age,
                     "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
-                    # anonymous field removed - all users are authenticated
                 },
                 "session": {
                     "access_token": auth_response.session.access_token,
@@ -167,6 +167,7 @@ class AuthService:
             elif "duplicate key value violates unique constraint" in error_message:
                 # This happens when the user profile already exists (created by trigger)
                 # This is actually a success case - user was created, profile exists
+                # Even if profile already exists, return session for immediate authentication
                 return {
                     "success": True,
                     "user": {
@@ -175,11 +176,14 @@ class AuthService:
                         "name": user_data.name,
                         "age": user_data.age,
                         "date_of_birth": user_data.date_of_birth if user_data.date_of_birth and user_data.date_of_birth.strip() else None,
-                        # anonymous field removed - all users are authenticated
                     },
-                    "session": None,  # No session until email is confirmed
-                    "email_confirmation_required": True,
-                    "message": "Registration successful! Please check your email and click the confirmation link to complete your account setup."
+                    "session": {
+                        "access_token": auth_response.session.access_token,
+                        "refresh_token": auth_response.session.refresh_token,
+                        "expires_at": auth_response.session.expires_at
+                    },
+                    "email_confirmation_required": False,
+                    "message": "Registration successful! You can now continue with your health journey."
                 }
             else:
                 raise HTTPException(
