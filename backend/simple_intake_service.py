@@ -136,7 +136,7 @@ class SimpleIntakeService:
         # For anonymous users, we'll create a temporary user record
         try:
             # Check if demo user exists in profiles table
-            demo_user_id = '0046f1ba-76c9-4ebc-aa6e-eb29239e338f'  # Real user UUID from profiles table
+            demo_user_id = '6ec2305f-0c72-4fea-9f61-f67e5b12e012'  # Real user UUID from profiles table
             
             # Verify the demo user exists in profiles table
             result = self.service_client.table('profiles').select('user_id').eq('user_id', demo_user_id).execute()
@@ -213,7 +213,7 @@ class SimpleIntakeService:
         
         # Create custom intervention record
         custom_intervention_data = {
-            'user_uuid': user_id,  # Use user_uuid instead of user_id
+            'user_id': user_id,  # Use user_id to match database schema
             'intake_id': intake_id,
             'intervention_name': additional_interventions,
             'description': f"User mentioned: {additional_interventions}",
