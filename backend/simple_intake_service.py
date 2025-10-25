@@ -132,41 +132,39 @@ class SimpleIntakeService:
     def _create_anonymous_user(self, user_input: UserInput) -> str:
         """Create an anonymous user for data collection"""
         
-        # For authenticated users, we should use their actual user ID
-        # For anonymous users, we'll create a temporary user record
+        # For anonymous users, we'll create a temporary profile
+        # We need to work around the foreign key constraint to profiles table
         try:
-            # Check if demo user exists in profiles table
-            demo_user_id = '6ec2305f-0c72-4fea-9f61-f67e5b12e012'  # Real user UUID from profiles table
+            # Generate a unique user ID for this anonymous session
+            import uuid
+            anonymous_user_id = str(uuid.uuid4())
             
-            # Verify the demo user exists in profiles table
-            result = self.service_client.table('profiles').select('user_id').eq('user_id', demo_user_id).execute()
+            # Create a temporary profile for anonymous user
+            # We'll use the service client to bypass RLS and create the profile
+            profile_data = {
+                'user_id': anonymous_user_id,
+                'date_of_birth': user_input.profile.dateOfBirth,
+                'dietary_preferences': user_input.dietaryPreferences.selected if user_input.dietaryPreferences else [],
+                'cycle_length': user_input.lastPeriod.cycleLength if user_input.lastPeriod else None,
+                'consent': True,
+                'anonymous': True
+            }
             
-            if result.data and len(result.data) > 0:
-                print(f"✅ Using existing demo user for anonymous intake: {demo_user_id}")
-                return demo_user_id
+            # Try to create profile with service client (bypasses RLS)
+            profile_result = self.service_client.table('profiles').insert(profile_data).execute()
+            if profile_result.data:
+                print(f"✅ Created temporary profile for anonymous user: {anonymous_user_id}")
+                return anonymous_user_id
             else:
-                print(f"⚠️ Demo user not found in profiles table, creating temporary profile")
-                # Create a temporary profile for anonymous user
-                profile_data = {
-                    'user_id': demo_user_id,
-                    'date_of_birth': user_input.profile.dateOfBirth,
-                    'dietary_preferences': user_input.dietaryPreferences.selected if user_input.dietaryPreferences else [],
-                    'cycle_length': user_input.lastPeriod.cycleLength if user_input.lastPeriod else None,
-                    'consent': True,
-                    'anonymous': True
-                }
-                
-                profile_result = self.service_client.table('profiles').insert(profile_data).execute()
-                if profile_result.data:
-                    print(f"✅ Created temporary profile for anonymous user: {demo_user_id}")
-                    return demo_user_id
-                else:
-                    raise Exception("Failed to create temporary profile")
+                raise Exception("Failed to create temporary profile")
                     
         except Exception as e:
             print(f"❌ Error creating anonymous user: {e}")
-            # Fallback to demo user ID even if profile creation fails
-            return demo_user_id
+            # For now, use a hardcoded anonymous user ID that exists in profiles
+            # This is a temporary workaround until we can fix the database schema
+            fallback_id = '6ec2305f-0c72-4fea-9f61-f67e5b12e012'  # Existing user in profiles
+            print(f"⚠️ Using fallback anonymous user ID: {fallback_id}")
+            return fallback_id
     
     def _process_previous_interventions(self, user_id: str, intake_id: str, interventions: List) -> None:
         """Process interventions the user has already tried"""

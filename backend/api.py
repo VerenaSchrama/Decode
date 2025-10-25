@@ -449,8 +449,6 @@ async def get_phase_aware_habits(
             detail=f"Error getting phase habits: {str(e)}"
         )
 
-# Global variable to track demo user daily progress (simple in-memory approach)
-demo_user_tracked_dates = set()
 
 @app.get("/user/{user_id}/daily-progress/{date}/status")
 async def get_daily_progress_status(user_id: str, date: str):
@@ -468,44 +466,30 @@ async def get_daily_progress_status(user_id: str, date: str):
         from models import supabase_client
         from datetime import datetime
         
-        # Map user_id to user_id (after migration)
-        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'
+        # Check if user has already tracked progress for this date
+        result = supabase_client.client.table('daily_summaries')\
+            .select('entry_date')\
+            .eq('user_id', user_id)\
+            .eq('entry_date', date)\
+            .execute()
         
-        if user_id == 'demo-user-123':
-            db_user_id = demo_user_id
-        else:
-            db_user_id = user_id
+        is_tracked = len(result.data) > 0
         
-        # For demo users, use a simple in-memory approach
-        if user_id == 'demo-user-123':
-            # Check our global tracking set
-            is_tracked = date in demo_user_tracked_dates
-            print(f"DEBUG: Demo user status check for {date}: is_tracked={is_tracked}")
-        else:
-            # For authenticated users, use the normal approach
-            result = supabase_client.client.table('daily_summaries')\
-                .select('id, entry_date, created_at')\
-                .eq('user_id', db_user_id)\
-                .eq('entry_date', date)\
-                .execute()
-            
-            is_tracked = len(result.data) > 0
-            
-            # If no daily_summaries found, check daily_habit_entries as fallback
-            if not is_tracked:
-                try:
-                    habit_result = supabase_client.client.table('daily_habit_entries')\
-                        .select('id, entry_date')\
-                        .eq('user_id', db_user_id)\
-                        .eq('entry_date', date)\
-                        .execute()
-                    
-                    is_tracked = len(habit_result.data) > 0
-                    print(f"DEBUG: Fallback check in daily_habit_entries found {len(habit_result.data)} entries")
-                except Exception as e:
-                    print(f"DEBUG: Fallback check failed: {e}")
+        # If no daily_summaries found, check daily_habit_entries as fallback
+        if not is_tracked:
+            try:
+                habit_result = supabase_client.client.table('daily_habit_entries')\
+                    .select('id, entry_date')\
+                    .eq('user_id', user_id)\
+                    .eq('entry_date', date)\
+                    .execute()
+                
+                is_tracked = len(habit_result.data) > 0
+                print(f"DEBUG: Fallback check in daily_habit_entries found {len(habit_result.data)} entries")
+            except Exception as e:
+                print(f"DEBUG: Fallback check failed: {e}")
         
-        print(f"DEBUG: Status check for {date}: is_tracked={is_tracked}")
+        print(f"DEBUG: Status check for user {user_id} on {date}: is_tracked={is_tracked}")
         
         return {
             "success": True,
@@ -527,7 +511,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
     Save daily habit and mood progress
     
     Args:
-        user_id: User ID (can be demo-user-123 for testing)
+        user_id: User ID
         entry_date: Date in YYYY-MM-DD format
         habits: Array of habit objects with completion status
         mood: Mood entry object (optional)
@@ -541,44 +525,31 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         import uuid
         from datetime import datetime
         
-        user_id = request.get('user_id', 'demo-user-123')
+        user_id = request.get('user_id')
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+            
         entry_date = request.get('entry_date', datetime.now().strftime('%Y-%m-%d'))
         
-        # Map user_id to user_uuid for database operations
-        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'
-        
-        if user_id == 'demo-user-123':
-            db_user_id = demo_user_id
-        else:
-            db_user_id = user_id
-        
         # Check if user has already tracked progress for this date
-        if user_id == 'demo-user-123':
-            # For demo users, check our global tracking set
-            if entry_date in demo_user_tracked_dates:
+        try:
+            existing_result = supabase_client.client.table('daily_summaries')\
+                .select('id, entry_date')\
+                .eq('user_id', user_id)\
+                .eq('entry_date', entry_date)\
+                .execute()
+            
+            if len(existing_result.data) > 0:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Daily progress already tracked for {entry_date}. Only one entry per day is allowed."
                 )
-        else:
-            # For authenticated users, check the database
-            try:
-                existing_result = supabase_client.client.table('daily_summaries')\
-                    .select('id, entry_date')\
-                    .eq('user_id', db_user_id)\
-                    .eq('entry_date', entry_date)\
-                    .execute()
-                
-                if len(existing_result.data) > 0:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Daily progress already tracked for {entry_date}. Only one entry per day is allowed."
-                    )
-            except HTTPException:
-                raise
-            except Exception as e:
-                print(f"Warning: Could not check existing entries: {e}")
-                # Continue with save operation if check fails
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Warning: Could not check existing entries: {e}")
+            # Continue with save operation if check fails
+            
         habits = request.get('habits', [])
         mood = request.get('mood', None)
         cycle_phase = request.get('cycle_phase', 'follicular')
@@ -591,146 +562,84 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         print(f"DEBUG: Processing {total_habits} habits, {len(completed_habits)} completed")
         print(f"DEBUG: Completed habits: {[h.get('habit', 'NO_HABIT_FIELD') for h in completed_habits]}")
         
-        # Prepare data for database
-        entry_data = {
-            'user_id': user_id,
-            'entry_date': entry_date,
-            'habits': habits,
-            'mood': mood,
-            'cycle_phase': cycle_phase,
-            'completed_count': len(completed_habits),
-            'total_habits': total_habits,
-            'completion_percentage': completion_percentage,
-            'created_at': datetime.now().isoformat()
-        }
-        
-        # Use the db_user_id we already determined above
-        print(f"DEBUG: Using db_user_id: {db_user_id} for user_id: {user_id}")
-        
-        # NEW SCHEMA: Create individual entries for each habit
+        # Create individual entries for each habit
         entry_ids = []
         
-        # Handle habit creation differently for demo vs authenticated users
         for habit in habits:
             habit_name = habit.get('habit', '')
             if not habit_name:
                 continue
             
-            if user_id == 'demo-user-123':
-                # For demo users, we'll use a simplified approach
-                # that doesn't require the user_habits table foreign key constraint
-                # We'll create a temporary habit_id for demo users
-                habit_id = f"demo-{habit_name.replace(' ', '-').lower()}"
-                print(f"DEBUG: Using demo habit_id: {habit_id}")
-            else:
-                # For authenticated users, use the normal user_habits table
-                # Check if user_habit exists, if not create it
-                user_habit_result = supabase_client.client.table('user_habits')\
-                    .select('id')\
-                    .eq('user_id', db_user_id)\
-                    .eq('habit_name', habit_name)\
-                    .execute()
-                
-                if not user_habit_result.data:
-                    # Create new user_habit
-                    user_habit_data = {
-                        'user_id': db_user_id,
-                        'habit_name': habit_name,
-                        'habit_description': f"Daily habit: {habit_name}",
-                        'status': 'active'
-                    }
-                    user_habit_result = supabase_client.client.table('user_habits').insert(user_habit_data).execute()
-                
-                habit_id = user_habit_result.data[0]['id']
+            # Check if user_habit exists, if not create it
+            user_habit_result = supabase_client.client.table('user_habits')\
+                .select('id')\
+                .eq('user_id', user_id)\
+                .eq('habit_name', habit_name)\
+                .execute()
             
-            if user_id == 'demo-user-123':
-                # For demo users, we'll store data in a simplified way
-                # that doesn't require foreign key constraints
-                # We'll just track the entry locally and return success
-                entry_id = f"demo-{entry_date}-{habit_id}"
-                entry_ids.append(entry_id)
-                print(f"DEBUG: Demo user entry created: {entry_id}")
-                
-                # Add to our global tracking set
-                demo_user_tracked_dates.add(entry_date)
-                print(f"DEBUG: Added {entry_date} to demo user tracked dates")
-                
-                # Store demo user data in daily_habit_entries table for status checking
-                try:
-                    daily_entry_data = {
-                        'user_id': db_user_id,
-                        'habit_id': habit_id,
-                        'entry_date': entry_date,
-                        'completed': habit.get('completed', False),
-                        'mood': mood.get('mood') if mood else None,
-                        'notes': mood.get('notes', '') if mood else ''
-                    }
-                    entry_result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
-                    print(f"DEBUG: Demo user daily entry stored: {entry_result.data}")
-                except Exception as e:
-                    print(f"DEBUG: Could not store daily entry for demo user: {e}")
-                    # Continue without failing the main operation
-                
-                # Also create a daily_summaries entry for demo users to enable status checking
-                try:
-                    daily_summary_data = {
-                        'user_id': db_user_id,
-                        'entry_date': entry_date,
-                        'completion_percentage': completion_percentage,
-                        'mood': mood.get('mood') if mood else None,
-                        'notes': mood.get('notes', '') if mood else '',
-                        'cycle_phase': cycle_phase,
-                        'total_habits': total_habits,
-                        'completed_habits': len(completed_habits)
-                    }
-                    summary_result = supabase_client.client.table('daily_summaries').insert(daily_summary_data).execute()
-                    print(f"DEBUG: Demo user daily summary created: {summary_result.data}")
-                except Exception as e:
-                    print(f"DEBUG: Could not create daily summary for demo user: {e}")
-                    # Continue without failing the main operation
-            else:
-                # For authenticated users, use the normal daily_habit_entries table
-                daily_entry_data = {
-                    'user_id': db_user_id,
-                    'habit_id': habit_id,
-                    'entry_date': entry_date,
-                    'completed': habit.get('completed', False),
-                    'mood': mood.get('mood') if mood else None,
-                    'notes': mood.get('notes', '') if mood else ''
+            if not user_habit_result.data:
+                # Create new user_habit
+                user_habit_data = {
+                    'user_id': user_id,
+                    'habit_name': habit_name,
+                    'habit_description': f"Daily habit: {habit_name}",
+                    'status': 'active'
                 }
-                
-                try:
-                    # Try to insert new entry
-                    result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
-                    entry_ids.append(result.data[0]['id'])
-                except Exception as e:
-                    if 'duplicate key value violates unique constraint' in str(e):
-                        # Update existing entry
-                        result = supabase_client.client.table('daily_habit_entries').update({
-                            'completed': daily_entry_data['completed'],
-                            'mood': daily_entry_data['mood'],
-                            'notes': daily_entry_data['notes'],
-                            'updated_at': datetime.now().isoformat()
-                        }).eq('user_id', db_user_id).eq('habit_id', habit_id).eq('entry_date', entry_date).execute()
-                        entry_ids.append(result.data[0]['id'] if result.data else str(uuid.uuid4()))
-                    else:
-                        raise e
+                user_habit_result = supabase_client.client.table('user_habits').insert(user_habit_data).execute()
+            
+            habit_id = user_habit_result.data[0]['id']
+            
+            # Create daily habit entry
+            daily_entry_data = {
+                'user_id': user_id,
+                'habit_id': habit_id,
+                'entry_date': entry_date,
+                'completed': habit.get('completed', False),
+                'mood': mood.get('mood') if mood else None,
+                'notes': mood.get('notes', '') if mood else ''
+            }
+            
+            try:
+                result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
+                entry_ids.append(result.data[0]['id'])
+                print(f"DEBUG: Created daily habit entry: {result.data[0]['id']}")
+            except Exception as e:
+                print(f"DEBUG: Could not create daily habit entry: {e}")
+                # Continue with other habits
         
-        print(f"DEBUG: Created/updated {len(entry_ids)} daily habit entries")
+        # Create daily summary
+        daily_summary_data = {
+            'user_id': user_id,
+            'entry_date': entry_date,
+            'completion_percentage': completion_percentage,
+            'mood': mood.get('mood') if mood else None,
+            'notes': mood.get('notes', '') if mood else '',
+            'cycle_phase': cycle_phase,
+            'total_habits': total_habits,
+            'completed_habits': len(completed_habits)
+        }
+        
+        try:
+            summary_result = supabase_client.client.table('daily_summaries').insert(daily_summary_data).execute()
+            print(f"DEBUG: Created daily summary: {summary_result.data[0]['id']}")
+        except Exception as e:
+            print(f"DEBUG: Could not create daily summary: {e}")
+            # Continue without failing the main operation
         
         return {
             "success": True,
-            "entry_id": entry_ids[0] if entry_ids else str(uuid.uuid4()),
+            "message": f"Daily progress saved for {entry_date}",
+            "entry_ids": entry_ids,
             "completion_percentage": completion_percentage,
-            "completed_habits": len(completed_habits),
-            "total_habits": total_habits
+            "total_habits": total_habits,
+            "completed_habits": len(completed_habits)
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error saving daily progress: {str(e)}"
-        )
+        print(f"Error saving daily progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/user/{user_id}/daily-progress")
 async def get_daily_progress(user_id: str, days: int = 7):
@@ -751,14 +660,9 @@ async def get_daily_progress(user_id: str, days: int = 7):
         import hashlib
         
         # Map user_id to user_uuid (after migration)
-        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        # Use user_id directly for all operations
         
-        if user_id == 'demo-user-123':
-            db_user_id = demo_user_id
-        else:
-            # For authenticated users, use their actual UUID
-            # Real users send their actual UUID as user_id
-            db_user_id = user_id
+        # Use user_id directly for all operations
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -768,7 +672,7 @@ async def get_daily_progress(user_id: str, days: int = 7):
         try:
             result = supabase_client.client.table('daily_habit_entries')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -813,14 +717,9 @@ async def get_daily_summaries(user_id: str, days: int = 7):
         from datetime import datetime, timedelta
         
         # Map user_id to user_uuid (after migration)
-        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        # Use user_id directly for all operations
         
-        if user_id == 'demo-user-123':
-            db_user_id = demo_user_id
-        else:
-            # For authenticated users, use their actual UUID
-            # Real users send their actual UUID as user_id
-            db_user_id = user_id
+        # Use user_id directly for all operations
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -830,7 +729,7 @@ async def get_daily_summaries(user_id: str, days: int = 7):
         try:
             result = supabase_client.client.table('daily_summaries')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -874,20 +773,15 @@ async def get_daily_summary(user_id: str, date: str):
         from models import supabase_client
         
         # Map user_id to user_uuid (after migration)
-        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        # Use user_id directly for all operations
         
-        if user_id == 'demo-user-123':
-            db_user_id = demo_user_id
-        else:
-            # For authenticated users, use their actual UUID
-            # Real users send their actual UUID as user_id
-            db_user_id = user_id
+        # Use user_id directly for all operations
         
         # Query specific day's summary
         try:
             result = supabase_client.client.table('daily_summaries')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .eq('entry_date', date)\
                 .execute()
             
@@ -930,14 +824,9 @@ async def get_user_analytics(user_id: str, days: int = 30):
         from datetime import datetime, timedelta
         
         # Map user_id to user_uuid (after migration)
-        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        # Use user_id directly for all operations
         
-        if user_id == 'demo-user-123':
-            db_user_id = demo_user_id
-        else:
-            # For authenticated users, use their actual UUID
-            # Real users send their actual UUID as user_id
-            db_user_id = user_id
+        # Use user_id directly for all operations
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -947,7 +836,7 @@ async def get_user_analytics(user_id: str, days: int = 30):
         try:
             result = supabase_client.client.table('daily_summaries')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -1059,14 +948,9 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
         from datetime import datetime, timedelta
         
         # Map user_id to user_uuid (after migration)
-        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        # Use user_id directly for all operations
         
-        if user_id == 'demo-user-123':
-            db_user_id = demo_user_id
-        else:
-            # For authenticated users, use their actual UUID
-            # Real users send their actual UUID as user_id
-            db_user_id = user_id
+        # Use user_id directly for all operations
         
         # Calculate date range
         end_date = datetime.now().date()
@@ -1077,7 +961,7 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             # First get daily summaries
             summaries_result = supabase_client.client.table('daily_summaries')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -1088,7 +972,7 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             # Get individual habit entries for each day
             habit_entries_result = supabase_client.client.table('daily_habit_entries')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -1206,20 +1090,15 @@ async def get_habit_streak(user_id: str):
         import hashlib
         
         # Map user_id to user_uuid (after migration)
-        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        # Use user_id directly for all operations
         
-        if user_id == 'demo-user-123':
-            db_user_id = demo_user_id
-        else:
-            # For authenticated users, use their actual UUID
-            # Real users send their actual UUID as user_id
-            db_user_id = user_id
+        # Use user_id directly for all operations
         
         # Get recent daily summaries for streak calculation
         try:
             result = supabase_client.client.table('daily_summaries')\
                 .select('entry_date, completion_percentage')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .gte('entry_date', (datetime.now().date() - timedelta(days=30)).isoformat())\
                 .order('entry_date', desc=True)\
                 .execute()
@@ -1851,14 +1730,9 @@ async def get_user_session_data(user_id: str):
         from datetime import datetime, timedelta
         
         # Map user_id to user_uuid (after migration)
-        demo_user_id = '117e24ea-3562-45f2-9256-f1b032d0d86b'  # Demo user UUID
+        # Use user_id directly for all operations
         
-        if user_id == 'demo-user-123':
-            db_user_id = demo_user_id
-        else:
-            # For authenticated users, use their actual UUID
-            # Real users send their actual UUID as user_id
-            db_user_id = user_id
+        # Use user_id directly for all operations
         
         session_data = {
             "user_id": user_id,
@@ -1873,7 +1747,7 @@ async def get_user_session_data(user_id: str):
         try:
             intake_result = supabase_client.client.table('intakes')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .order('created_at', desc=True)\
                 .limit(1)\
                 .execute()
@@ -1897,7 +1771,7 @@ async def get_user_session_data(user_id: str):
         try:
             period_result = supabase_client.client.table('intervention_periods')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .eq('status', 'active')\
                 .order('start_date', desc=True)\
                 .limit(1)\
@@ -1924,7 +1798,7 @@ async def get_user_session_data(user_id: str):
             
             progress_result = supabase_client.client.table('daily_habit_entries')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .gte('entry_date', start_date.isoformat())\
                 .lte('entry_date', end_date.isoformat())\
                 .order('entry_date', desc=True)\
@@ -1938,7 +1812,7 @@ async def get_user_session_data(user_id: str):
         try:
             periods_result = supabase_client.client.table('intervention_periods')\
                 .select('*')\
-                .eq('user_id', db_user_id)\
+                .eq('user_id', user_id)\
                 .order('start_date', desc=True)\
                 .execute()
             
