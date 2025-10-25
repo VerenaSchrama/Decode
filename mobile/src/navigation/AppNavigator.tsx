@@ -70,6 +70,17 @@ export default function AppNavigator({
     console.log('Intervention selected:', intervention.name);
     console.log('Period data:', periodData);
     
+    // Check if user is properly authenticated
+    if (!session?.access_token) {
+      console.error('❌ User not authenticated - cannot start intervention period');
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to start tracking your intervention.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     // Store the current intervention
     onInterventionSelected?.(intervention);
     
