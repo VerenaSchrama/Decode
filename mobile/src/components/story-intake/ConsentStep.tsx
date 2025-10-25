@@ -27,13 +27,14 @@ export const ConsentStep: React.FC<ConsentStepProps> = ({
   onComplete,
 }) => {
   const [consent, setConsent] = useState(data.consent || false);
-  const [anonymous, setAnonymous] = useState(data.anonymous || false);
+  // Anonymous functionality removed - all users are authenticated
+  const [anonymous, setAnonymous] = useState(false); // Keep for compatibility but always false
 
   const handleComplete = () => {
     const updatedData = {
       ...data,
       consent,
-      anonymous,
+      // anonymous field removed - all users are authenticated
     };
     onUpdate(updatedData);
     onComplete(updatedData);
@@ -90,31 +91,11 @@ export const ConsentStep: React.FC<ConsentStepProps> = ({
             <Text style={styles.privacyText}>
               • You can request to delete your data at any time
             </Text>
-            <Text style={styles.privacyText}>
-              • You can choose to remain anonymous
-            </Text>
-            <Text style={styles.privacyText}>
-              • You can opt out of data collection while still getting recommendations
-            </Text>
+            {/* Anonymous option removed - all users are authenticated */}
           </View>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.switchContainer}>
-            <View style={styles.switchTextContainer}>
-              <Text style={styles.switchLabel}>Stay anonymous</Text>
-              <Text style={styles.switchDescription}>
-                We won't store your name, but you can still get personalized recommendations
-              </Text>
-            </View>
-            <Switch
-              value={anonymous}
-              onValueChange={setAnonymous}
-              trackColor={{ false: '#e5e7eb', true: colors.primary }}
-              thumbColor={anonymous ? '#ffffff' : '#f3f4f6'}
-            />
-          </View>
-        </View>
+        {/* Anonymous toggle removed - all users are authenticated */}
 
         <View style={styles.card}>
           <View style={styles.consentContainer}>

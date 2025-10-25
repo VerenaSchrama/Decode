@@ -36,8 +36,12 @@ export default function AnalysisScreen({
   const loadStreak = async () => {
     try {
       console.log('🔄 AnalysisScreen: Loading streak...');
-      // Use authenticated user ID or fallback to demo user
-      const userId = user?.id || 'demo-user-123';
+      // Use authenticated user ID
+      const userId = user?.id;
+      if (!userId) {
+        console.error('No authenticated user found');
+        return;
+      }
       console.log('Using user ID:', userId);
       const streakResponse = await DailyProgressAPI.getHabitStreak(userId);
       console.log('✅ AnalysisScreen: Streak loaded:', streakResponse.current_streak);

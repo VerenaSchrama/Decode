@@ -28,7 +28,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
     interventions: { selected: [], additional: '' },
     dietaryPreferences: { selected: [], additional: '' },
     consent: false,
-    anonymous: user?.anonymous || false,
+    anonymous: false, // All users are authenticated
   });
 
   const handleNext = () => {

@@ -38,8 +38,12 @@ export default function NutritionistChatScreen({
   const scrollViewRef = useRef<ScrollView>(null);
   const { showToast } = useToast();
 
-  // Generate a simple user ID for demo purposes
-  const userId = 'demo-user-123';
+  // Use authenticated user ID
+  const userId = user?.id;
+  if (!userId) {
+    console.error('No authenticated user found');
+    return null;
+  }
 
   useEffect(() => {
     loadChatHistory();
@@ -126,7 +130,7 @@ export default function NutritionistChatScreen({
           interventions: { selected: [] },
           dietaryPreferences: { selected: [] },
           consent: true,
-          anonymous: false
+          // anonymous field removed - all users are authenticated
         },
         current_intervention: currentIntervention || { name: "Mediterranean Diet" },
         selected_habits: selectedHabits || ["Eat with your cycle", "Drink more water"],

@@ -3,7 +3,7 @@ export interface TempUser {
   password: string;
   name: string;
   age?: number;
-  anonymous: boolean;
+  // anonymous field removed - all users are authenticated
 }
 
 export interface User {
@@ -11,7 +11,7 @@ export interface User {
   email: string;
   name: string;
   age?: number;
-  anonymous: boolean;
+  // anonymous field removed - all users are authenticated
 }
 
 export interface AuthSession {
@@ -31,7 +31,7 @@ export interface RegisterRequest {
   password: string;
   name: string;
   age?: number;
-  anonymous: boolean;
+  // anonymous field removed - all users are authenticated
 }
 
 export interface AuthResponse {

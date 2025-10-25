@@ -39,7 +39,7 @@ export class UserInterventionsAPI {
 
   static async submitIntervention(
     intervention: UserInterventionRequest,
-    userId: string = 'demo-user'
+    userId: string
   ): Promise<UserInterventionResponse> {
     try {
       const response = await fetch(`${this.baseUrl}/submit?user_id=${userId}`, {
@@ -94,7 +94,7 @@ export class UserInterventionsAPI {
   static async submitFeedback(
     interventionId: string,
     feedback: InterventionFeedbackRequest,
-    userId: string = 'demo-user'
+    userId: string
   ): Promise<void> {
     try {
       const response = await fetch(`${this.baseUrl}/${interventionId}/feedback?user_id=${userId}`, {

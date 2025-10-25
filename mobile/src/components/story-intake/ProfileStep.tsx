@@ -17,11 +17,12 @@ interface ProfileStepProps {
 export default function ProfileStep({ data, onComplete }: ProfileStepProps) {
   const [name, setName] = useState(data.name);
   const [dateOfBirth, setDateOfBirth] = useState(data.dateOfBirth || '');
-  const [anonymous, setAnonymous] = useState(false);
+  // Anonymous functionality removed - all users are authenticated
+  const [anonymous, setAnonymous] = useState(false); // Keep for compatibility but always false
 
   const handleComplete = () => {
     const profileData: Profile = {
-      name: anonymous ? '' : name,
+      name: name, // Always use the name since anonymous is disabled
       dateOfBirth: dateOfBirth,
     };
     onComplete(profileData);
@@ -55,22 +56,7 @@ export default function ProfileStep({ data, onComplete }: ProfileStepProps) {
         <Text style={styles.helperText}>This helps us provide age-appropriate recommendations</Text>
       </View>
 
-      <View style={styles.card}>
-        <View style={styles.switchContainer}>
-          <View style={styles.switchTextContainer}>
-            <Text style={styles.switchLabel}>Stay anonymous</Text>
-            <Text style={styles.switchDescription}>
-              We won't store your name, but you can still get personalized recommendations
-            </Text>
-          </View>
-          <Switch
-            value={anonymous}
-            onValueChange={setAnonymous}
-            trackColor={{ false: '#e5e7eb', true: '#3b82f6' }}
-            thumbColor={anonymous ? '#ffffff' : '#f3f4f6'}
-          />
-        </View>
-      </View>
+      {/* Anonymous toggle removed - all users are authenticated */}
 
     </View>
   );

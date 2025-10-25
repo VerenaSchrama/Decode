@@ -44,7 +44,7 @@ export default function TestScreen() {
         additional: "Testing dietary preferences"
       },
       consent: true,
-      anonymous: false
+      // anonymous field removed - all users are authenticated
     };
 
     const result = await getRecommendations(sampleInput);

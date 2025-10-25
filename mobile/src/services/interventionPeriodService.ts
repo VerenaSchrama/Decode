@@ -7,7 +7,7 @@ import { api } from './api';
 
 export interface InterventionPeriod {
   id: string;
-  user_uuid: string;
+  user_id: string;
   intake_id: string;
   intervention_name: string;
   intervention_id?: string;

@@ -28,7 +28,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
     password: '',
     name: '',
     age: undefined,
-    anonymous: false,
+    // anonymous field removed - all users are authenticated
   });
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

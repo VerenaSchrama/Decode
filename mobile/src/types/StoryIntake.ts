@@ -46,7 +46,7 @@ export interface StoryIntakeData {
   interventions: Interventions;
   dietaryPreferences: DietaryPreferences;
   consent: boolean;
-  anonymous: boolean;
+  // anonymous field removed - all users are authenticated
   intake_id?: string; // ID returned from backend after intake submission
 }
 

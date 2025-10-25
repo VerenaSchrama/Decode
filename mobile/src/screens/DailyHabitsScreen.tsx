@@ -330,8 +330,12 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const loadCurrentStreak = async () => {
     try {
       console.log('🔄 Loading current streak...');
-      // Use authenticated user ID or fallback to demo user
-      const userId = user?.id || 'demo-user-123';
+      // Use authenticated user ID
+      const userId = user?.id;
+      if (!userId) {
+        console.error('No authenticated user found');
+        return;
+      }
       console.log('Using user ID:', userId);
       const streakResponse = await apiService.getHabitStreak(userId);
       console.log('✅ Streak loaded:', streakResponse.current_streak);
@@ -517,7 +521,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       } : undefined;
 
       await apiService.saveDailyProgress({
-        user_id: user?.id || 'demo-user-123',
+        user_id: user?.id,
         entry_date: today,
         habits: apiHabits,
         mood: apiMood,
@@ -525,7 +529,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       });
 
       // Update streak after saving
-      const streakResponse = await apiService.getHabitStreak(user?.id || 'demo-user-123');
+      const streakResponse = await apiService.getHabitStreak(user?.id);
       setCurrentStreak(streakResponse.current_streak);
       
       // Mark today as tracked
