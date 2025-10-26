@@ -180,7 +180,12 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
         {/* You Section */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>You</Text>
+            <View style={styles.avatarContainer}>
+              <Ionicons name="person" size={40} color={colors.primary} />
+            </View>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.cardTitle}>You</Text>
+            </View>
           </View>
           
           <View style={styles.profileInfoItem}>
@@ -350,13 +355,13 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#FFF7F5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginRight: 12,
   },
   name: {
     fontSize: 24,
@@ -384,11 +389,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  headerTextContainer: {
+    flex: 1,
+  },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
-    marginLeft: 8,
   },
   cyclePhaseContainer: {
     flexDirection: 'row',
