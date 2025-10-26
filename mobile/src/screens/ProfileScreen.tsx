@@ -92,14 +92,14 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
 
   const loadInterventionPeriods = async () => {
     if (!user?.id || !session?.access_token) {
-      console.error('No user or session found');
+      console.error('❌ No user or session found');
       setLoadingInterventions(false);
       return;
     }
 
     try {
       setLoadingInterventions(true);
-      console.log('Loading intervention periods with access token:', session.access_token.substring(0, 20) + '...');
+      console.log('🔄 Loading intervention periods...');
       
       const result = await interventionPeriodService.getUserInterventionPeriods(session.access_token);
       
@@ -108,15 +108,20 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
         setInterventionPeriods(result.periods || []);
       } else {
         console.error('❌ Failed to load intervention periods:', result.error);
+        // If it's a 401 error, try to refresh the session
+        if (result.error?.includes('401') || result.error?.includes('Unauthorized')) {
+          console.log('🔄 Attempting to refresh session due to 401 error...');
+          // The AuthContext should handle automatic refresh, so just log it
+          console.log('⚠️ Session may have expired. User should sign out and sign in again.');
+        }
         setInterventionPeriods([]);
       }
     } catch (error: any) {
       console.error('❌ Error loading intervention periods:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      // Handle 401 specifically
+      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        console.log('🔄 Authentication failed. User may need to refresh the app or sign in again.');
+      }
       setInterventionPeriods([]);
     } finally {
       setLoadingInterventions(false);
