@@ -154,7 +154,7 @@ export default function AnalysisScreen({
               <Text style={styles.summaryLabel}>Habits</Text>
               <View style={styles.streakContainer}>
                 <Text style={styles.summaryValue}>
-                  {isLoadingStreak ? '...' : currentStreak > 0 ? `🔥 ${currentStreak} day streak` : 'Ready to start'}
+                  {isLoadingStreak ? '...' : currentStreak > 0 ? `${currentStreak} day streak` : 'Ready to start'}
                 </Text>
                 {isLoadingStreak && (
                   <Ionicons name="sync" size={14} color={colors.primary} style={styles.loadingIcon} />
@@ -182,9 +182,9 @@ export default function AnalysisScreen({
               <Text style={styles.chatIconText}>💬</Text>
             </View>
             <View style={styles.chatTextContainer}>
-              <Text style={styles.chatTitle}>Chat with Your Nutritionist</Text>
+              <Text style={styles.chatTitle}>Start expert chat</Text>
               <Text style={styles.chatDescription}>
-                Get personalized advice based on your profile and current intervention
+                Get personalized science-based answers based on your profile and progress
               </Text>
             </View>
             <Text style={styles.chatArrow}>→</Text>
