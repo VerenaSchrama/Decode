@@ -160,7 +160,7 @@ export default function AnalysisScreen({
               <Text style={styles.summaryLabel}>Habits</Text>
               <View style={styles.streakContainer}>
                 <Text style={styles.summaryValue}>
-                  {isLoadingStreak ? '...' : currentStreak > 0 ? `🔥 ${currentStreak} day streak` : '🎯 Ready to start'}
+                  {isLoadingStreak ? '...' : currentStreak > 0 ? `🔥 ${currentStreak} day streak` : 'Ready to start'}
                 </Text>
                 {isLoadingStreak && (
                   <Ionicons name="sync" size={14} color={colors.primary} style={styles.loadingIcon} />
@@ -174,7 +174,6 @@ export default function AnalysisScreen({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Personal insights from your Nutritionist</Text>
           <View style={styles.comingSoonContainer}>
-            <Text style={styles.comingSoonIcon}>🚧</Text>
             <Text style={styles.comingSoonTitle}>Coming Soon</Text>
             <Text style={styles.comingSoonText}>
               AI-powered insights and analytics based on your tracking patterns are coming soon!
