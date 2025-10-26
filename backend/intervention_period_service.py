@@ -72,10 +72,59 @@ class InterventionPeriodService:
             result = self.supabase.client.table('intervention_periods').insert(period_data).execute()
             
             if result.data:
+                period_id = result.data[0]['id']
                 print(f"✅ Started intervention period: {intervention_name} for user {user_id}")
+                
+                # Store selected habits in user_habits table
+                if selected_habits and len(selected_habits) > 0:
+                    try:
+                        # Get all available habits to find their IDs
+                        all_habits = self.supabase.client.table('HabitsBASE').select('*').execute()
+                        habit_name_to_id = {habit['Habit_Name']: habit['Habit_ID'] for habit in all_habits.data}
+                        
+                        # Create user_habits entries for each selected habit
+                        user_habits_data = []
+                        for habit_name in selected_habits:
+                            habit_id = habit_name_to_id.get(habit_name)
+                            
+                            if habit_id:
+                                # Check if user_habit already exists
+                                existing = self.supabase.client.table('user_habits')\
+                                    .select('id')\
+                                    .eq('user_id', user_id)\
+                                    .eq('habit_name', habit_name)\
+                                    .execute()
+                                
+                                if not existing.data:
+                                    # Create new user_habit
+                                    user_habit_record = {
+                                        'user_id': user_id,
+                                        'habit_name': habit_name,
+                                        'habit_id': habit_id,
+                                        'habit_description': f"Daily habit: {habit_name}",
+                                        'status': 'active',
+                                        'created_at': datetime.now().isoformat(),
+                                        'updated_at': datetime.now().isoformat()
+                                    }
+                                    user_habits_data.append(user_habit_record)
+                                    print(f"✅ Creating user_habit for: {habit_name}")
+                                else:
+                                    print(f"⚠️ user_habit already exists for: {habit_name}")
+                            else:
+                                print(f"⚠️ Could not find habit_id for: {habit_name}")
+                        
+                        # Insert user_habits in batch if any new ones
+                        if user_habits_data:
+                            user_habits_result = self.supabase.client.table('user_habits').insert(user_habits_data).execute()
+                            print(f"✅ Created {len(user_habits_data)} user_habits entries")
+                    
+                    except Exception as habit_error:
+                        print(f"⚠️ Error storing user_habits: {habit_error}")
+                        # Continue even if habits storage fails
+                
                 return {
                     "success": True,
-                    "period_id": result.data[0]['id'],
+                    "period_id": period_id,
                     "message": f"Started tracking intervention: {intervention_name}"
                 }
             else:
