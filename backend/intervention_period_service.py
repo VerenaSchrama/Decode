@@ -22,7 +22,6 @@ class InterventionPeriod(BaseModel):
     actual_end_date: Optional[datetime] = Field(None, description="Actual completion date")
     status: str = Field(default="active", description="active, completed, paused, abandoned")
     cycle_phase_at_start: Optional[str] = Field(None, description="Cycle phase when started")
-    completion_percentage: float = Field(default=0.0, ge=0.0, le=100.0, description="Overall completion percentage")
     notes: Optional[str] = Field(None, description="User notes about the intervention")
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
@@ -62,7 +61,6 @@ class InterventionPeriodService:
             "actual_end_date": None,
             "status": "active",
             "cycle_phase_at_start": cycle_phase,
-            "completion_percentage": 0.0,
             "notes": None,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
@@ -93,13 +91,11 @@ class InterventionPeriodService:
     def update_intervention_progress(
         self, 
         period_id: str, 
-        completion_percentage: float,
         notes: Optional[str] = None
     ) -> Dict[str, Any]:
         """Update intervention progress"""
         
         update_data = {
-            "completion_percentage": completion_percentage,
             "updated_at": datetime.now().isoformat()
         }
         
@@ -112,7 +108,7 @@ class InterventionPeriodService:
             if result.data:
                 return {
                     "success": True,
-                    "message": f"Updated progress to {completion_percentage}%"
+                    "message": f"Updated progress"
                 }
             else:
                 raise Exception("Failed to update progress")
@@ -127,7 +123,6 @@ class InterventionPeriodService:
     def complete_intervention_period(
         self, 
         period_id: str, 
-        completion_percentage: float = 100.0,
         notes: Optional[str] = None
     ) -> Dict[str, Any]:
         """Mark intervention period as completed"""
@@ -135,7 +130,6 @@ class InterventionPeriodService:
         update_data = {
             "status": "completed",
             "actual_end_date": datetime.now().isoformat(),
-            "completion_percentage": completion_percentage,
             "updated_at": datetime.now().isoformat()
         }
         
