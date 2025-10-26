@@ -167,6 +167,9 @@ export default function AppNavigator({
       };
       
       console.log('📤 Starting intervention period with request:', startRequest);
+      console.log('🔍 DEBUG: session.access_token exists?', !!session.access_token);
+      console.log('🔍 DEBUG: session.access_token length:', session.access_token?.length);
+      console.log('🔍 DEBUG: session.access_token preview:', session.access_token?.substring(0, 20) + '...');
       
       const result = await interventionPeriodService.startInterventionPeriod(
         startRequest,
