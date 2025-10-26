@@ -400,13 +400,10 @@ class AuthService:
             Token verification result
         """
         try:
-            # Set the session for the client
-            self.client.auth.set_session(access_token, "")
+            # Verify the token by getting user info directly
+            user = self.client.auth.get_user(access_token)
             
-            # Get the current user
-            user = self.client.auth.get_user()
-            
-            if not user:
+            if not user or not user.user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid token"
@@ -414,9 +411,9 @@ class AuthService:
             
             return {
                 "success": True,
-                "user_id": user.id,
-                "email": user.email,
-                "email_confirmed": bool(user.email_confirmed_at),
+                "user_id": user.user.id,
+                "email": user.user.email,
+                "email_confirmed": bool(user.user.email_confirmed_at),
                 "message": "Token is valid"
             }
             

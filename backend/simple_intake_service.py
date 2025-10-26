@@ -126,9 +126,9 @@ class SimpleIntakeService:
     def _process_previous_interventions(self, user_id: str, intake_id: str, interventions: List) -> None:
         """Process interventions the user has already tried"""
         
-        # Get all available interventions from database
-        all_interventions = self.supabase.get_interventions()
-        intervention_name_to_id = {intervention['name']: intervention['id'] for intervention in all_interventions.data}
+        # Get all available interventions from database using service client
+        all_interventions = self.service_client.table('InterventionsBASE').select('*').execute()
+        intervention_name_to_id = {intervention['Strategy_Name']: intervention['Intervention_ID'] for intervention in all_interventions.data}
         
         # Create user-intervention relationships for interventions they've tried
         for intervention_item in interventions:
@@ -177,7 +177,7 @@ class SimpleIntakeService:
         }
         
         try:
-            self.supabase.create_custom_intervention(custom_intervention_data)
+            self.service_client.table('custom_interventions').insert(custom_intervention_data).execute()
         except Exception as e:
             print(f"⚠️ Could not create custom intervention: {e}")
             # Continue execution even if custom intervention storage fails
@@ -190,13 +190,13 @@ class SimpleIntakeService:
         similarity_score = recommendation_data.get('similarity_score', 0.0)
         reasoning = recommendation_data.get('reasoning', '')
         
-        # Find the intervention ID by name
+        # Find the intervention ID by name using service client
         intervention_id = None
         if intervention_name:
-            interventions = self.supabase.get_interventions()
+            interventions = self.service_client.table('InterventionsBASE').select('*').execute()
             for intervention in interventions.data:
-                if intervention['name'] == intervention_name:
-                    intervention_id = intervention['id']
+                if intervention['Strategy_Name'] == intervention_name:
+                    intervention_id = intervention['Intervention_ID']
                     break
         
         if intervention_id:
@@ -208,7 +208,10 @@ class SimpleIntakeService:
             }
             
             try:
-                self.supabase.create_recommendation(recommendation_record)
+                # Store recommendation data in the intakes table using service client
+                self.service_client.table('intakes').update({
+                    'recommendation_data': recommendation_record
+                }).eq('id', intake_id).execute()
                 print(f"✅ Stored recommendation for intake {intake_id}")
             except Exception as e:
                 print(f"Warning: Could not store recommendation: {e}")
@@ -221,9 +224,9 @@ class SimpleIntakeService:
     def _store_recommended_habits(self, intake_id: str, recommended_habits: List[str]) -> None:
         """Store the recommended habits for this intake"""
         
-        # Get all available habits to find their IDs
-        all_habits = self.supabase.get_all_habits()
-        habit_name_to_id = {habit['name']: habit['id'] for habit in all_habits.data}
+        # Get all available habits to find their IDs using service client
+        all_habits = self.service_client.table('HabitsBASE').select('*').execute()
+        habit_name_to_id = {habit['Habit_Name']: habit['Habit_ID'] for habit in all_habits.data}
         
         for i, habit_name in enumerate(recommended_habits, 1):
             habit_id = habit_name_to_id.get(habit_name)

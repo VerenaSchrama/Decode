@@ -1435,8 +1435,8 @@ async def start_intervention_period(
                 # Regular token verification only
                 auth_service = AuthService()
                 user_info = await auth_service.verify_token(access_token)
-                if user_info and user_info.get("user"):
-                    user_id = user_info["user"]["id"]
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
                     print(f"✅ Starting intervention for authenticated user: {user_id}")
                 else:
                     print("⚠️ Token verification failed")
@@ -1494,8 +1494,8 @@ async def get_active_intervention_period(authorization: str = Header(None)):
                 access_token = authorization.split(" ")[1]
                 auth_service = AuthService()
                 user_info = await auth_service.verify_token(access_token)
-                if user_info and user_info.get("user"):
-                    user_id = user_info["user"]["id"]
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
                 else:
                     raise HTTPException(status_code=401, detail="Invalid authentication token")
             except Exception as e:
@@ -1531,8 +1531,8 @@ async def get_intervention_periods_history(authorization: str = Header(None)):
                 access_token = authorization.split(" ")[1]
                 auth_service = AuthService()
                 user_info = await auth_service.verify_token(access_token)
-                if user_info and user_info.get("user"):
-                    user_id = user_info["user"]["id"]
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
                 else:
                     raise HTTPException(status_code=401, detail="Invalid authentication token")
             except Exception as e:
