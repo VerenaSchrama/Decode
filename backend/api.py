@@ -1518,6 +1518,7 @@ async def start_intervention_period(
         selected_habits = request.get("selected_habits", [])
         intervention_id = request.get("intervention_id")
         planned_duration_days = request.get("planned_duration_days", 30)
+        start_date = request.get("start_date")  # User-selected start date
         cycle_phase = request.get("cycle_phase")
         
         if not intake_id or not intervention_name:
@@ -1531,7 +1532,8 @@ async def start_intervention_period(
             selected_habits=selected_habits,
             intervention_id=intervention_id,
             planned_duration_days=planned_duration_days,
-            cycle_phase=cycle_phase  # Pass cycle_phase parameter
+            start_date=start_date,  # Pass user-selected start_date
+            cycle_phase=cycle_phase
         )
         
         if result["success"]:

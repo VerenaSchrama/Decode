@@ -41,12 +41,19 @@ class InterventionPeriodService:
         selected_habits: List[str],
         intervention_id: Optional[int] = None,
         planned_duration_days: int = 30,
+        start_date: Optional[str] = None,
         cycle_phase: Optional[str] = None
     ) -> Dict[str, Any]:
         """Start tracking a new intervention period"""
         
-        # Calculate planned end date
-        end_date_dt = datetime.now() + timedelta(days=planned_duration_days)
+        # Use user-selected start_date or default to now
+        if start_date:
+            start_date_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        else:
+            start_date_dt = datetime.now()
+        
+        # Calculate planned end date based on start_date
+        end_date_dt = start_date_dt + timedelta(days=planned_duration_days)
         
         # Create intervention period record - aligned with Supabase schema
         period_data = {
@@ -56,7 +63,7 @@ class InterventionPeriodService:
             "intervention_name": intervention_name,
             "intervention_id": intervention_id,
             "selected_habits": selected_habits,
-            "start_date": datetime.now().isoformat(),
+            "start_date": start_date_dt.isoformat(),
             "end_date": end_date_dt.isoformat(),
             "planned_duration_days": planned_duration_days,
             "actual_end_date": None,

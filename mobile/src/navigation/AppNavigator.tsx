@@ -163,6 +163,7 @@ export default function AppNavigator({
         selected_habits: interventionHabits,
         intervention_id: intervention.id,
         planned_duration_days: periodData.durationDays,
+        start_date: periodData.startDate, // User-selected start date
         cycle_phase: cyclePhase
       };
       
