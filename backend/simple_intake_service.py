@@ -128,7 +128,7 @@ class SimpleIntakeService:
         
         # Get all available interventions from database using service client
         all_interventions = self.service_client.table('InterventionsBASE').select('*').execute()
-        intervention_name_to_id = {intervention['Strategy_Name']: intervention['Intervention_ID'] for intervention in all_interventions.data}
+        intervention_name_to_id = {intervention['strategy_name']: intervention['Intervention_ID'] for intervention in all_interventions.data}
         
         # Create user-intervention relationships for interventions they've tried
         for intervention_item in interventions:
@@ -195,7 +195,7 @@ class SimpleIntakeService:
         if intervention_name:
             interventions = self.service_client.table('InterventionsBASE').select('*').execute()
             for intervention in interventions.data:
-                if intervention['Strategy_Name'] == intervention_name:
+                if intervention['strategy_name'] == intervention_name:
                     intervention_id = intervention['Intervention_ID']
                     break
         
