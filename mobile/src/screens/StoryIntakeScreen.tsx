@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView } from 'react-native';
 import { StoryIntakeData, STORY_INTAKE_STEPS } from '../types/StoryIntake';
-import { NameStep } from '../components/story-intake/NameStep';
-import { DateOfBirthStep } from '../components/story-intake/DateOfBirthStep';
 import { LastPeriodStep } from '../components/story-intake/LastPeriodStep';
 import { CycleLengthStep } from '../components/story-intake/CycleLengthStep';
 import { SymptomsStep } from '../components/story-intake/SymptomsStep';
@@ -18,7 +16,7 @@ interface StoryIntakeScreenProps {
 
 export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps) {
   const { user, session } = useAuth();
-  const [currentStep, setCurrentStep] = useState(2); // Start at LastPeriodStep - skip Name and Age (already collected during registration)
+  const [currentStep, setCurrentStep] = useState(0); // Start at LastPeriodStep (step 0) - Name and Age collected during registration
   const [formData, setFormData] = useState<StoryIntakeData>({
     profile: { 
       name: user?.name || '', // Pre-populate with name from authenticated user
@@ -38,7 +36,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
   };
 
   const handleBack = () => {
-    if (currentStep > 2) { // Can't go back beyond LastPeriodStep (step 2)
+    if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
   };
@@ -95,7 +93,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
 
   const renderStepComponent = () => {
     switch (currentStep) {
-      case 2: // LastPeriodStep
+      case 0: // LastPeriodStep
         return (
           <LastPeriodStep
             data={formData}
@@ -104,7 +102,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
             onBack={handleBack}
           />
         );
-      case 3: // CycleLengthStep (was case 3, now case 3)
+      case 1: // CycleLengthStep
         // Show CycleLengthStep only if user has periods and selected a date
         if (formData.lastPeriod?.hasPeriod && formData.lastPeriod?.date) {
           return (
@@ -120,7 +118,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
           handleNext();
           return null;
         }
-      case 4: // SymptomsStep (was case 4, now case 4)
+      case 2: // SymptomsStep
         return (
           <SymptomsStep
             data={formData}
@@ -129,7 +127,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
             onBack={handleBack}
           />
         );
-      case 5: // InterventionsStep (was case 5, now case 5)
+      case 3: // InterventionsStep
         return (
           <InterventionsStep
             data={formData}
@@ -138,7 +136,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
             onBack={handleBack}
           />
         );
-      case 6: // DietaryStep (was case 6, now case 6)
+      case 4: // DietaryStep
         return (
           <DietaryStep
             data={formData}
@@ -147,7 +145,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
             onBack={handleBack}
           />
         );
-      case 7: // ConsentStep (was case 7, now case 7)
+      case 5: // ConsentStep
         return (
           <ConsentStep
             data={formData}

@@ -58,50 +58,39 @@ export interface StoryIntakeStep {
 }
 
 export const STORY_INTAKE_STEPS: StoryIntakeStep[] = [
+  // Note: Name and Age are collected during registration, not in intake flow
   {
     id: 1,
-    title: "Your Name",
-    subtitle: "What should we call you?",
-    component: "NameStep"
-  },
-  {
-    id: 2,
-    title: "Date of Birth",
-    subtitle: "When were you born?",
-    component: "DateOfBirthStep"
-  },
-  {
-    id: 3,
     title: "Last Period",
     subtitle: "When did your last period begin?",
     component: "LastPeriodStep"
   },
   {
-    id: 4,
+    id: 2,
     title: "Cycle Length",
     subtitle: "What's your average cycle length?",
     component: "CycleLengthStep"
   },
   {
-    id: 5,
+    id: 3,
     title: "Symptoms & Conditions",
     subtitle: "Have you ever experienced any of the following symptoms?",
     component: "SymptomsStep"
   },
   {
-    id: 6,
+    id: 4,
     title: "Food Interventions You've Tried",
     subtitle: "What dietary approaches have you experimented with?",
     component: "InterventionsStep"
   },
   {
-    id: 7,
+    id: 5,
     title: "Dietary Preferences",
     subtitle: "What are your dietary preferences and restrictions?",
     component: "DietaryStep"
   },
   {
-    id: 8,
+    id: 6,
     title: "Consent & Privacy",
     subtitle: "Your data, your choice",
     component: "ConsentStep"
