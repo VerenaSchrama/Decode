@@ -67,15 +67,15 @@ export const STORY_INTAKE_STEPS: StoryIntakeStep[] = [
   },
   {
     id: 2,
-    title: "Cycle Length",
-    subtitle: "What's your average cycle length?",
-    component: "CycleLengthStep"
-  },
-  {
-    id: 3,
     title: "Last Period",
     subtitle: "When did your last period begin?",
     component: "LastPeriodStep"
+  },
+  {
+    id: 3,
+    title: "Cycle Length",
+    subtitle: "What's your average cycle length?",
+    component: "CycleLengthStep"
   },
   {
     id: 4,

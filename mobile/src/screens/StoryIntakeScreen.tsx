@@ -30,14 +30,34 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
   });
 
   const handleNext = () => {
-    if (currentStep < STORY_INTAKE_STEPS.length - 1) {
-      setCurrentStep(currentStep + 1);
+    // Skip CycleLengthStep if user doesn't have a period
+    let nextStep = currentStep + 1;
+    
+    // If we're at step 1 (LastPeriod) and user doesn't have a period, skip to Interventions
+    if (currentStep === 1 && formData.lastPeriod?.hasPeriod === false) {
+      nextStep = 3; // Skip CycleLengthStep (2) and go to InterventionsStep (3)
+    }
+    
+    // If we're going back to step 2 (CycleLength) but user doesn't have a period, skip it
+    if (nextStep === 2 && formData.lastPeriod?.hasPeriod === false) {
+      nextStep = 3;
+    }
+    
+    if (nextStep < STORY_INTAKE_STEPS.length + 1) { // +1 to account for skipped step
+      setCurrentStep(nextStep);
     }
   };
 
   const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+    let prevStep = currentStep - 1;
+    
+    // If we're at Interventions (step 3) and user doesn't have a period, go back to LastPeriod
+    if (currentStep === 3 && formData.lastPeriod?.hasPeriod === false) {
+      prevStep = 1; // Go back to LastPeriod, skip CycleLength
+    }
+    
+    if (prevStep >= 0) {
+      setCurrentStep(prevStep);
     }
   };
 
@@ -96,9 +116,20 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
     }
   };
 
+  // Calculate which step to show based on whether user has a period
+  const getAdjustedStep = (step: number) => {
+    // After LastPeriodStep (step 1), check if user doesn't have a period
+    if (step === 2 && formData.lastPeriod?.hasPeriod === false) {
+      return 3; // Skip CycleLengthStep, go to InterventionsStep
+    }
+    return step;
+  };
+
   const renderStepComponent = () => {
-    switch (currentStep) {
-      case 0: // SymptomsStep (now first step)
+    const adjustedStep = getAdjustedStep(currentStep);
+    
+    switch (adjustedStep) {
+      case 0: // SymptomsStep (first step)
         return (
           <SymptomsStep
             data={formData}
@@ -107,16 +138,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
             onBack={handleBack}
           />
         );
-      case 1: // CycleLengthStep (now second step)
-        return (
-          <CycleLengthStep
-            data={formData}
-            onUpdate={handleUpdate}
-            onNext={handleNext}
-            onBack={handleBack}
-          />
-        );
-      case 2: // LastPeriodStep (now third step)
+      case 1: // LastPeriodStep (now second step)
         return (
           <LastPeriodStep
             data={formData}
@@ -125,7 +147,16 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
             onBack={handleBack}
           />
         );
-      case 3: // InterventionsStep (now fourth step)
+      case 2: // CycleLengthStep (now third step, but skipped if no period)
+        return (
+          <CycleLengthStep
+            data={formData}
+            onUpdate={handleUpdate}
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        );
+      case 3: // InterventionsStep (fourth step)
         return (
           <InterventionsStep
             data={formData}
