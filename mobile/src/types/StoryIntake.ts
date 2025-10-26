@@ -61,9 +61,9 @@ export const STORY_INTAKE_STEPS: StoryIntakeStep[] = [
   // Note: Name and Age are collected during registration, not in intake flow
   {
     id: 1,
-    title: "Last Period",
-    subtitle: "When did your last period begin?",
-    component: "LastPeriodStep"
+    title: "Symptoms & Conditions",
+    subtitle: "Have you ever experienced any of the following symptoms?",
+    component: "SymptomsStep"
   },
   {
     id: 2,
@@ -73,9 +73,9 @@ export const STORY_INTAKE_STEPS: StoryIntakeStep[] = [
   },
   {
     id: 3,
-    title: "Symptoms & Conditions",
-    subtitle: "Have you ever experienced any of the following symptoms?",
-    component: "SymptomsStep"
+    title: "Last Period",
+    subtitle: "When did your last period begin?",
+    component: "LastPeriodStep"
   },
   {
     id: 4,

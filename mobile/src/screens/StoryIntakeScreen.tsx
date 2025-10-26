@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView } from 'react-native';
 import { StoryIntakeData, STORY_INTAKE_STEPS } from '../types/StoryIntake';
-import { LastPeriodStep } from '../components/story-intake/LastPeriodStep';
-import { CycleLengthStep } from '../components/story-intake/CycleLengthStep';
 import { SymptomsStep } from '../components/story-intake/SymptomsStep';
+import { CycleLengthStep } from '../components/story-intake/CycleLengthStep';
+import { LastPeriodStep } from '../components/story-intake/LastPeriodStep';
 import { InterventionsStep } from '../components/story-intake/InterventionsStep';
 import { DietaryStep } from '../components/story-intake/DietaryStep';
 import { ConsentStep } from '../components/story-intake/ConsentStep';
@@ -93,32 +93,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
 
   const renderStepComponent = () => {
     switch (currentStep) {
-      case 0: // LastPeriodStep
-        return (
-          <LastPeriodStep
-            data={formData}
-            onUpdate={handleUpdate}
-            onNext={handleNext}
-            onBack={handleBack}
-          />
-        );
-      case 1: // CycleLengthStep
-        // Show CycleLengthStep only if user has periods and selected a date
-        if (formData.lastPeriod?.hasPeriod && formData.lastPeriod?.date) {
-          return (
-            <CycleLengthStep
-              data={formData}
-              onUpdate={handleUpdate}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          );
-        } else {
-          // Skip cycle length step and go to symptoms
-          handleNext();
-          return null;
-        }
-      case 2: // SymptomsStep
+      case 0: // SymptomsStep (now first step)
         return (
           <SymptomsStep
             data={formData}
@@ -127,7 +102,25 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
             onBack={handleBack}
           />
         );
-      case 3: // InterventionsStep
+      case 1: // CycleLengthStep (now second step)
+        return (
+          <CycleLengthStep
+            data={formData}
+            onUpdate={handleUpdate}
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        );
+      case 2: // LastPeriodStep (now third step)
+        return (
+          <LastPeriodStep
+            data={formData}
+            onUpdate={handleUpdate}
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        );
+      case 3: // InterventionsStep (now fourth step)
         return (
           <InterventionsStep
             data={formData}
