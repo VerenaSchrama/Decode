@@ -46,14 +46,14 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
   };
 
   const handleComplete = async (data: StoryIntakeData) => {
+    // Use formData instead of data parameter to ensure all updates are included
+    const finalData = { ...formData, ...data };
+    
     try {
       // Check if user is authenticated
       if (!session?.access_token) {
         throw new Error('User not authenticated. Please log in to get recommendations.');
       }
-      
-      // Use formData instead of data parameter to ensure all updates are included
-      const finalData = { ...formData, ...data };
       
       // Debug: Log the data being sent
       console.log('🔍 DEBUG: Sending intake data:', JSON.stringify(finalData, null, 2));
