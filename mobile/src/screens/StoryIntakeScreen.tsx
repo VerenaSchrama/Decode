@@ -75,6 +75,11 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
 
       const result = await response.json();
       
+      // Debug: Log the full response to see if intake_id is present
+      console.log('🔍 DEBUG: Full backend response:', JSON.stringify(result, null, 2));
+      console.log('🔍 DEBUG: data_collection:', result.data_collection);
+      console.log('🔍 DEBUG: intake_id from response:', result.data_collection?.intake_id);
+      
       // Add the intake_id to the data for tracking
       const enhancedData = {
         ...finalData,
@@ -82,7 +87,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
         recommendations: result.interventions
       };
       
-      console.log('✅ Intake completed:', enhancedData);
+      console.log('✅ Intake completed with intake_id:', enhancedData.intake_id);
       onComplete(enhancedData);
     } catch (error) {
       console.error('❌ Error completing intake:', error);
