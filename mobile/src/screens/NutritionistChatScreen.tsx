@@ -38,14 +38,19 @@ export default function NutritionistChatScreen({
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const { showToast } = useToast();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
-  // Use authenticated user ID
+  // Use authenticated user ID and session
   const userId = user?.id;
-  if (!userId) {
-    console.error('No authenticated user found');
+  if (!userId || !session?.access_token) {
+    console.error('No authenticated user or session found');
     return null;
   }
+
+  // Set auth token for API service
+  useEffect(() => {
+    apiService.setAuthToken(session.access_token);
+  }, [session?.access_token]);
 
   useEffect(() => {
     loadChatHistory();
@@ -57,7 +62,7 @@ export default function NutritionistChatScreen({
       
       // Try to load from server first
       try {
-        const data = await apiService.getChatHistory(userId);
+        const data = await apiService.getChatHistory();
         
         if (data.messages && data.messages.length > 0) {
           // Reverse to show oldest first
@@ -125,17 +130,11 @@ export default function NutritionistChatScreen({
       const data = await apiService.sendChatMessage({
         user_id: userId,
         message: messageText,
-        intake_data: intakeData || {
-          profile: { name: "Demo User", dateOfBirth: "1995-01-01" },
-          lastPeriod: { hasPeriod: true, date: "2024-12-15", cycleLength: 28 },
-          symptoms: { selected: ["bloating", "mood swings"] },
-          interventions: { selected: [] },
-          dietaryPreferences: { selected: [] },
-          consent: true,
-          // anonymous field removed - all users are authenticated
-        },
-        current_intervention: currentIntervention || { name: "Mediterranean Diet" },
-        selected_habits: selectedHabits || ["Eat with your cycle", "Drink more water"],
+        // intake_data, current_intervention, and selected_habits are now optional
+        // Backend will fetch from Supabase using the auth token
+        intake_data: intakeData,
+        current_intervention: currentIntervention,
+        selected_habits: selectedHabits,
       });
       
       const aiMessage: ChatMessage = {

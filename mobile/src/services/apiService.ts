@@ -105,6 +105,14 @@ export interface HabitStreakResponse {
 
 class ApiService {
   private config = getApiConfig();
+  private authToken: string | null = null;
+
+  /**
+   * Set authentication token for subsequent requests
+   */
+  setAuthToken(token: string | null) {
+    this.authToken = token;
+  }
 
   /**
    * Make HTTP request with retry logic
@@ -120,12 +128,19 @@ class ApiService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
     
+    // Include Authorization header if auth token is available
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers as Record<string, string>,
+    };
+    
+    if (this.authToken) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.authToken}`;
+    }
+    
     const requestOptions: RequestInit = {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       signal: controller.signal,
     };
 
@@ -211,17 +226,20 @@ class ApiService {
    * Send chat message
    */
   async sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
+    // Include Authorization header for authenticated requests
     return this.makeRequest<ChatResponse>('/chat/message', {
       method: 'POST',
       body: JSON.stringify(request),
+      // Authorization header should be added by makeRequest if available
     });
   }
 
   /**
-   * Get chat history
+   * Get chat history for authenticated user
    */
-  async getChatHistory(userId: string): Promise<{ messages: ChatMessage[] }> {
-    return this.makeRequest<{ messages: ChatMessage[] }>(`/chat/history/${userId}`);
+  async getChatHistory(): Promise<{ messages: ChatMessage[] }> {
+    // Endpoint now uses authentication instead of user_id parameter
+    return this.makeRequest<{ messages: ChatMessage[] }>('/chat/history');
   }
 
   // ===== CUSTOM INTERVENTION API METHODS =====
