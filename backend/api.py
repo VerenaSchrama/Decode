@@ -2526,6 +2526,46 @@ async def verify_token(authorization: str = Header(None)):
     access_token = authorization.split(" ")[1]
     return await auth_service.verify_token(access_token)
 
+@app.on_event("startup")
+async def startup_event():
+    """Background tasks on app startup"""
+    import asyncio
+    
+    async def daily_recalculation_task():
+        """Run cycle phase recalculation daily at 00:01"""
+        import schedule
+        import time
+        from services.cycle_phase_service import get_cycle_phase_service
+        
+        def recalculate_all():
+            """Sync function to run async recalculation"""
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                cycle_service = get_cycle_phase_service()
+                result = loop.run_until_complete(cycle_service.recalculate_all_phases())
+                print(f"✅ Daily cycle phase recalculation completed: {result.get('updated_count', 0)} users updated")
+            finally:
+                loop.close()
+        
+        # Schedule daily recalculation at 00:01
+        schedule.every().day.at("00:01").do(recalculate_all)
+        
+        print("✅ Scheduled daily cycle phase recalculation at 00:01")
+        
+        # Run scheduler in a separate thread
+        import threading
+        def run_scheduler():
+            while True:
+                schedule.run_pending()
+                time.sleep(60)  # Check every minute
+        
+        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+        scheduler_thread.start()
+    
+    # Start the background task
+    asyncio.create_task(daily_recalculation_task())
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
