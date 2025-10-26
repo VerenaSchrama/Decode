@@ -1412,6 +1412,71 @@ def build_user_context(intake_data: Optional[dict], current_intervention: Option
     return "\n".join(context_parts) if context_parts else "No specific user context available."
 
 # ============================================================================
+# INTAKE ENDPOINTS
+# ============================================================================
+
+@app.get("/user/intake/latest")
+async def get_latest_intake_id(
+    authorization: str = Header(None)
+):
+    """Get the most recent intake_id for authenticated user"""
+    try:
+        from auth_service import AuthService
+        
+        # Verify authentication
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
+                    print(f"✅ Authenticated user: {user_id}")
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Fetch most recent intake for user
+        from models import supabase_client
+        try:
+            result = supabase_client.client.table('intakes')\
+                .select('id, created_at')\
+                .eq('user_id', user_id)\
+                .order('created_at', desc=True)\
+                .limit(1)\
+                .execute()
+            
+            if result.data and len(result.data) > 0:
+                intake_id = result.data[0]['id']
+                print(f"✅ Found intake_id: {intake_id}")
+                return {
+                    "success": True,
+                    "intake_id": intake_id,
+                    "created_at": result.data[0]['created_at']
+                }
+            else:
+                print(f"⚠️ No intake found for user {user_id}")
+                return {
+                    "success": False,
+                    "intake_id": None,
+                    "message": "No intake found"
+                }
+        except Exception as e:
+            print(f"❌ Database error: {e}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting latest intake: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+# ============================================================================
 # INTERVENTION PERIOD TRACKING ENDPOINTS
 # ============================================================================
 

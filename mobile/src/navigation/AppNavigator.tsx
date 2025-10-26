@@ -10,6 +10,7 @@ import MainAppScreen from '../screens/MainAppScreen';
 import { interventionPeriodService } from '../services/interventionPeriodService';
 import { useAuth } from '../contexts/AuthContext';
 import { CyclePhaseService } from '../services/cyclePhaseService';
+import { getApiConfig } from '../config/environment';
 
 export type AppScreen = 'test' | 'story-intake' | 'thank-you' | 'recommendations' | 'habit-selection' | 'main-app';
 
@@ -111,8 +112,40 @@ export default function AppNavigator({
     console.log('🔍 DEBUG: intakeData:', JSON.stringify(intakeData, null, 2));
     console.log('🔍 DEBUG: intakeData?.intake_id:', intakeData?.intake_id);
     
-    // Check if intake_id is available
-    if (!intakeData?.intake_id) {
+    // Get or validate intake_id from backend API
+    let validIntakeId = intakeData?.intake_id;
+    
+    // If intake_id is missing, try to fetch the most recent intake from backend
+    if (!validIntakeId) {
+      console.log('⚠️ intake_id not found in intakeData, fetching from backend API...');
+      try {
+        const apiUrl = getApiConfig().baseUrl;
+        const response = await fetch(`${apiUrl}/user/intake/latest`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.intake_id) {
+            validIntakeId = result.intake_id;
+            console.log('✅ Found intake_id from backend:', validIntakeId);
+          } else {
+            console.warn('⚠️ No intake_id found in backend response:', result);
+          }
+        } else {
+          console.error('❌ Error fetching intake_id from backend:', response.status);
+        }
+      } catch (error) {
+        console.error('❌ Error in backend fetch:', error);
+      }
+    }
+    
+    // Check if we have a valid intake_id
+    if (!validIntakeId) {
       console.error('❌ No intake_id available - cannot start intervention period');
       console.error('❌ Full intakeData object:', intakeData);
       Alert.alert(
@@ -125,7 +158,7 @@ export default function AppNavigator({
     
     try {
       const startRequest = {
-        intake_id: intakeData.intake_id,
+        intake_id: validIntakeId,
         intervention_name: intervention.name,
         selected_habits: interventionHabits,
         intervention_id: intervention.id,
