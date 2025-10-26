@@ -598,14 +598,12 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             
             habit_id = user_habit_result.data[0]['id']
             
-            # Create daily habit entry
+            # Create daily habit entry (mood no longer stored here)
             daily_entry_data = {
                 'user_id': user_id,
                 'habit_id': habit_id,
                 'entry_date': entry_date,
-                'completed': habit.get('completed', False),
-                'mood': mood.get('mood') if mood else None,
-                'notes': mood.get('notes', '') if mood else ''
+                'completed': habit.get('completed', False)
             }
             
             try:
@@ -615,6 +613,27 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             except Exception as e:
                 print(f"DEBUG: Could not create daily habit entry: {e}")
                 # Continue with other habits
+        
+        # Create daily mood entry (stored separately from habit entries)
+        if mood:
+            try:
+                daily_mood_data = {
+                    'user_id': user_id,
+                    'entry_date': entry_date,
+                    'mood': mood.get('mood'),
+                    'notes': mood.get('notes', ''),
+                    'symptoms': mood.get('symptoms', []),
+                    'cycle_phase': cycle_phase
+                }
+                # Use upsert to handle duplicate entries for the same day
+                mood_result = supabase_client.client.table('daily_moods').upsert(
+                    daily_mood_data,
+                    { 'on_conflict': 'user_id,entry_date' }
+                ).execute()
+                print(f"DEBUG: Created/updated daily mood entry")
+            except Exception as e:
+                print(f"DEBUG: Could not create daily mood entry: {e}")
+                # Continue without failing the main operation
         
         # Create daily summary
         daily_summary_data = {
@@ -1018,10 +1037,29 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             
             habits_by_date[date].append({
                 'habit_name': habit_name,
-                'completed': entry.get('completed', False),
-                'mood': entry.get('mood'),
-                'notes': entry.get('notes', '')
+                'completed': entry.get('completed', False)
             })
+        
+        # Get mood data from daily_moods table
+        moods_by_date = {}
+        try:
+            moods_result = supabase_client.client.table('daily_moods')\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', end_date.isoformat())\
+                .execute()
+            
+            for mood_entry in moods_result.data:
+                date = mood_entry['entry_date']
+                moods_by_date[date] = {
+                    'mood': mood_entry.get('mood'),
+                    'symptoms': mood_entry.get('symptoms', []),
+                    'notes': mood_entry.get('notes', ''),
+                    'date': date
+                }
+        except Exception as e:
+            print(f"Could not retrieve mood data: {e}")
         
         # Combine summaries with habit details
         history_entries = []
@@ -1029,26 +1067,8 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             date = summary['entry_date']
             habits = habits_by_date.get(date, [])
             
-            # Get mood data from the most recent habit entry with mood
-            mood_data = None
-            for habit in habits:
-                if habit.get('mood') is not None:
-                    mood_data = {
-                        'mood': habit['mood'],
-                        'symptoms': [],  # We don't store symptoms in individual entries
-                        'notes': habit.get('notes', ''),
-                        'date': date
-                    }
-                    break
-            
-            # If no mood in habit entries, use summary mood
-            if not mood_data and summary.get('mood'):
-                mood_data = {
-                    'mood': summary['mood'],
-                    'symptoms': [],
-                    'notes': summary.get('notes', ''),
-                    'date': date
-                }
+            # Get mood data from daily_moods table
+            mood_data = moods_by_date.get(date)
             
             history_entry = {
                 'id': summary['id'],
