@@ -42,46 +42,18 @@ export const checkAPIHealth = async () => {
 // Get recommendations
 export const getRecommendations = async (storyIntakeData: any, accessToken?: string) => {
   try {
-    // Calculate age from date of birth
-    const calculateAge = (dateOfBirth: string) => {
-      if (!dateOfBirth || dateOfBirth.trim() === '') return 25; // Default age
-      
-      const today = new Date();
-      const birthDate = new Date(dateOfBirth);
-      
-      // Check if the date is valid
-      if (isNaN(birthDate.getTime())) {
-        console.warn('Invalid date of birth provided:', dateOfBirth);
-        return 25; // Default age for invalid dates
-      }
-      
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-      
-      // Ensure age is within reasonable bounds
-      if (age < 13 || age > 120) {
-        console.warn('Calculated age out of bounds:', age, 'using default');
-        return 25;
-      }
-      
-      return age;
-    };
-
-            // Transform the Story Intake data to match your backend's expected format
-            const calculatedAge = calculateAge(storyIntakeData.profile.dateOfBirth);
-            console.log('📊 Age calculation:', {
-              dateOfBirth: storyIntakeData.profile.dateOfBirth,
-              calculatedAge: calculatedAge
-            });
-            
-            const userInput = {
-              profile: {
-                name: storyIntakeData.profile.name || 'Anonymous',
-                age: calculatedAge,
-              },
+    // Age is provided directly from registration, no need to calculate
+    console.log('📊 Profile data:', {
+      name: storyIntakeData.profile.name,
+      age: storyIntakeData.profile.age
+    });
+    
+    // Transform the Story Intake data to match your backend's expected format
+    const userInput = {
+      profile: {
+        name: storyIntakeData.profile.name || 'Anonymous',
+        age: storyIntakeData.profile.age || 25, // Use age from profile directly
+      },
               lastPeriod: storyIntakeData.lastPeriod || null,
               symptoms: {
                 selected: storyIntakeData.symptoms.selected || [],
