@@ -1172,12 +1172,14 @@ async def get_habit_streak(user_id: str):
         )
 
 @app.post("/chat/message")
-async def send_chat_message(request: ChatRequest):
+async def send_chat_message(request: ChatRequest, authorization: str = Header(None)):
     """
-    Send a message to the nutritionist chat and get a RAG-based response
+    Send a message to the chat and get a RAG-based response
+    Fetches user data from Supabase to build context
     
     Args:
-        request: Chat request with user message and context
+        request: Chat request with user message and optional context
+        authorization: Bearer token for authentication
         
     Returns:
         AI nutritionist response with context information
@@ -1186,15 +1188,104 @@ async def send_chat_message(request: ChatRequest):
         if not RAG_AVAILABLE:
             raise HTTPException(status_code=503, detail="RAG pipeline not available")
         
-        # Debug: Log what data we're receiving
-        print(f"Chat request data: {request.intake_data}")
-        print(f"Current intervention: {request.current_intervention}")
-        print(f"Selected habits: {request.selected_habits}")
+        # Verify authentication and get user_id
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                from auth_service import AuthService
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
+                    print(f"✅ Authenticated user for chat: {user_id}")
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Fetch user data from Supabase
+        from models import supabase_client
+        
+        # Get latest intake data
+        intake_data = None
+        current_intervention_data = None
+        user_habits_list = []
+        
+        try:
+            # Fetch latest intake
+            intake_result = supabase_client.client.table('intakes')\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .order('created_at', desc=True)\
+                .limit(1)\
+                .execute()
+            
+            if intake_result.data and len(intake_result.data) > 0:
+                intake_row = intake_result.data[0]
+                # Extract intake_data JSONB field
+                intake_data_raw = intake_row.get('intake_data', {})
+                
+                # Normalize intake_data structure
+                intake_data = {
+                    'profile': intake_data_raw.get('profile', {}),
+                    'lastPeriod': intake_data_raw.get('last_period', intake_data_raw.get('lastPeriod', {})),
+                    'symptoms': intake_data_raw.get('symptoms', {}),
+                    'interventions': intake_data_raw.get('interventions', {}),
+                    'dietaryPreferences': intake_data_raw.get('dietary_preferences', intake_data_raw.get('dietaryPreferences', {}))
+                }
+                print(f"✅ Fetched intake data for user {user_id}")
+        except Exception as e:
+            print(f"Warning: Could not fetch intake data: {e}")
+        
+        try:
+            # Fetch current intervention period
+            intervention_result = supabase_client.client.table('intervention_periods')\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .eq('status', 'active')\
+                .order('created_at', desc=True)\
+                .limit(1)\
+                .execute()
+            
+            if intervention_result.data and len(intervention_result.data) > 0:
+                period = intervention_result.data[0]
+                current_intervention_data = {
+                    'name': period.get('intervention_name', 'Unknown'),
+                    'habits': period.get('selected_habits', []),
+                    'start_date': period.get('start_date'),
+                    'duration_days': period.get('planned_duration_days', 0)
+                }
+                print(f"✅ Fetched intervention data for user {user_id}")
+        except Exception as e:
+            print(f"Warning: Could not fetch intervention data: {e}")
+        
+        try:
+            # Fetch user's active habits
+            habits_result = supabase_client.client.table('user_habits')\
+                .select('habit_name')\
+                .eq('user_id', user_id)\
+                .eq('status', 'active')\
+                .execute()
+            
+            if habits_result.data:
+                user_habits_list = [habit['habit_name'] for habit in habits_result.data]
+                print(f"✅ Fetched {len(user_habits_list)} active habits for user {user_id}")
+        except Exception as e:
+            print(f"Warning: Could not fetch habits: {e}")
+        
+        # Use fetched data or fallback to request data
+        final_intake_data = intake_data or request.intake_data
+        final_intervention = current_intervention_data or request.current_intervention
+        final_selected_habits = user_habits_list if user_habits_list else (request.selected_habits or [])
         
         # Calculate current cycle phase if intake data includes period info
         cycle_phase_info = None
-        if request.intake_data and request.intake_data.get('lastPeriod'):
-            last_period = request.intake_data['lastPeriod']
+        if final_intake_data and final_intake_data.get('lastPeriod'):
+            last_period = final_intake_data['lastPeriod']
             if last_period.get('hasPeriod') and last_period.get('date') and last_period.get('cycleLength'):
                 try:
                     from utils.cycle_calculator import calculate_cycle_phase
@@ -1213,9 +1304,9 @@ async def send_chat_message(request: ChatRequest):
         
         # Build user context for the chat
         user_context = build_user_context(
-            request.intake_data,
-            request.current_intervention,
-            request.selected_habits,
+            final_intake_data,
+            final_intervention,
+            final_selected_habits,
             cycle_phase_info
         )
         
@@ -1227,7 +1318,9 @@ async def send_chat_message(request: ChatRequest):
         
         # Create enhanced prompt with user context
         enhanced_prompt = f"""
-        You are a knowledgeable nutritionist and women's health expert specializing in cycle-aware nutrition and wellness. You have access to scientific research and evidence-based practices on women's health interventions.
+        You are a knowledgeable nutritionist and women's health expert specializing in cycle-aware nutrition and wellness.
+        You have access to scientific research and evidence-based practices on women's health and food interventions.
+        You are trained to provide personalized advice based on the user's profile and current intervention and habits, defined as:
 
         USER CONTEXT:
         {user_context}
@@ -1272,9 +1365,7 @@ Remember, I'm here to support your health journey with evidence-based recommenda
         message_id = str(uuid.uuid4())
         user_timestamp = datetime.now().isoformat()
         
-        # Generate a consistent UUID for the user_id (hash-based for demo purposes)
-        import hashlib
-        user_id = str(uuid.UUID(hashlib.md5(request.user_id.encode()).hexdigest()[:32]))
+        # Use authenticated user_id directly (no hashing needed)
         
         # Store user message
         user_message = {
@@ -1318,25 +1409,41 @@ Remember, I'm here to support your health journey with evidence-based recommenda
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/chat/history/{user_id}")
-async def get_chat_history(user_id: str, limit: int = 50):
+@app.get("/chat/history")
+async def get_chat_history(authorization: str = Header(None), limit: int = 50):
     """
-    Get chat history for a user
+    Get chat history for authenticated user
     
     Args:
-        user_id: User ID
+        authorization: Bearer token for authentication
         limit: Maximum number of messages to return
         
     Returns:
         List of chat messages
     """
     try:
-        from models import supabase_client
-        # Generate the same UUID for the user_id
-        import hashlib
-        user_id = str(uuid.UUID(hashlib.md5(user_id.encode()).hexdigest()[:32]))
-        print(f"Looking for chat history for user_id: {user_id}, UUID: {user_id}")
+        # Verify authentication
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                from auth_service import AuthService
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
+                    print(f"✅ Authenticated user for chat history: {user_id}")
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
         
+        from models import supabase_client
+        
+        # Fetch chat history for authenticated user
         result = supabase_client.client.table('chat_messages')\
             .select('*')\
             .eq('user_id', user_id)\
@@ -1346,8 +1453,10 @@ async def get_chat_history(user_id: str, limit: int = 50):
         
         print(f"Found {len(result.data)} messages for user {user_id}")
         return {"messages": result.data}
+    except HTTPException:
+        raise
     except Exception as e:
-        # Return empty history if table doesn't exist
+        # Return empty history if table doesn't exist or other error
         print(f"Warning: Could not retrieve chat history: {e}")
         return {"messages": []}
 
