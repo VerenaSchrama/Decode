@@ -161,7 +161,8 @@ export default function AppNavigator({
         intake_id: validIntakeId,
         intervention_name: intervention.name,
         selected_habits: interventionHabits,
-        intervention_id: intervention.id,
+        // Skip intervention_id - it's an integer from InterventionsBASE, not a UUID
+        // intervention_id: intervention.id,
         planned_duration_days: periodData.durationDays,
         cycle_phase: cyclePhase
       };

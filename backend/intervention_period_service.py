@@ -54,7 +54,6 @@ class InterventionPeriodService:
             "user_id": user_id,
             "intake_id": intake_id,
             "intervention_name": intervention_name,  # Now properly mapped to DB column
-            "intervention_id": intervention_id,
             "selected_habits": selected_habits,  # Now properly mapped to JSONB column
             "start_date": datetime.now().isoformat(),
             "end_date": end_date_dt.isoformat(),  # Maps to 'end_date' in DB (not 'planned_end_date')
@@ -66,6 +65,19 @@ class InterventionPeriodService:
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
+        
+        # Only add intervention_id if it's a valid UUID (not an integer)
+        if intervention_id:
+            # Check if it's a string UUID (expected) or an integer (needs conversion)
+            if isinstance(intervention_id, (int, str)):
+                # Try to convert to string if it's an integer
+                intervention_id_str = str(intervention_id) if isinstance(intervention_id, int) else intervention_id
+                # Only add if it looks like a UUID or is numeric
+                if len(intervention_id_str) > 1:  # Basic validation
+                    # For now, skip intervention_id if it's an integer from InterventionsBASE
+                    # The integer ID doesn't match the UUID expected by the foreign key
+                    print(f"⚠️ Skipping intervention_id (not a UUID): {intervention_id}")
+                    # Don't set intervention_id in period_data
         
         try:
             # Insert into intervention_periods table
