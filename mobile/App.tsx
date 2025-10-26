@@ -27,6 +27,8 @@ function AppContent() {
   };
 
   const handleIntakeComplete = (data: StoryIntakeData) => {
+    console.log('🔍 DEBUG App.tsx: handleIntakeComplete called with data:', JSON.stringify(data, null, 2));
+    console.log('🔍 DEBUG App.tsx: intake_id in data:', data.intake_id);
     setIntakeData(data);
   };
 
