@@ -105,6 +105,14 @@ export default function RecommendationsScreen({ intakeData, onBack, onHabitsSele
         // Handle both old and new API response formats
         const data = result.data;
         console.log('📊 API Response data:', JSON.stringify(data, null, 2));
+        console.log('🔍 DEBUG: data_collection in response:', data.data_collection);
+        console.log('🔍 DEBUG: intake_id in data_collection:', data.data_collection?.intake_id);
+        
+        // Extract intake_id from backend response if available
+        if (data.data_collection?.intake_id) {
+          console.log('✅ intake_id extracted from backend:', data.data_collection.intake_id);
+          // TODO: Store intake_id in intakeData state or pass it back to parent
+        }
         
         // Check if it's the new format (multiple interventions)
         if (data.interventions && Array.isArray(data.interventions)) {
