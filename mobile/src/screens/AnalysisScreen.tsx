@@ -142,12 +142,6 @@ export default function AnalysisScreen({
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Mood & Food Diary</Text>
-          <Text style={styles.subtitle}>Get expert insights</Text>
-        </View>
-
         {/* Weekly Summary */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Your Progress</Text>
