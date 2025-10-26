@@ -5,6 +5,7 @@ Simple intake service for collecting user data during recommendations
 from typing import Dict, List, Optional
 import time
 import os
+import uuid
 from supabase import create_client, Client
 from models import supabase_client, UserInput
 
@@ -51,6 +52,7 @@ class SimpleIntakeService:
         
         # Create intake record - store all data in JSONB format
         intake_data = {
+            'id': str(uuid.uuid4()),  # Generate UUID for intake_id
             'user_id': user_id,  # Use user_id to match database schema
             'intake_data': {
                 'profile': {
