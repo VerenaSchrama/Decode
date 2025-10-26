@@ -36,8 +36,14 @@ export default function AppNavigator({
 }: AppNavigatorProps) {
   const { session } = useAuth();
   const handleStoryIntakeComplete = (data: StoryIntakeData) => {
+    // Save intake data first
     onIntakeComplete(data);
-    onScreenChange('thank-you');
+    
+    // Use a small timeout to ensure state updates before navigation
+    // This ensures intakeData is available when navigating to thank-you
+    setTimeout(() => {
+      onScreenChange('thank-you');
+    }, 100);
   };
 
   const handleViewRecommendations = () => {
