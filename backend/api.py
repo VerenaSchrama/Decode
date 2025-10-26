@@ -1565,13 +1565,11 @@ async def complete_intervention_period(
         from intervention_period_service import intervention_period_service
         
         # Extract completion data
-        completion_percentage = request.get("completion_percentage", 100.0)
         notes = request.get("notes")
         
         # Complete intervention period
         result = intervention_period_service.complete_intervention_period(
             period_id=period_id,
-            completion_percentage=completion_percentage,
             notes=notes
         )
         
