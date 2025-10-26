@@ -10,6 +10,7 @@ import { InterventionsStep } from '../components/story-intake/InterventionsStep'
 import { DietaryStep } from '../components/story-intake/DietaryStep';
 import { ConsentStep } from '../components/story-intake/ConsentStep';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiConfig } from '../config/environment';
 
 interface StoryIntakeScreenProps {
   onComplete: (data: StoryIntakeData) => void;
@@ -17,7 +18,7 @@ interface StoryIntakeScreenProps {
 
 export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps) {
   const { user, session } = useAuth();
-  const [currentStep, setCurrentStep] = useState(2); // Start at step 2 (LastPeriodStep) instead of 0 (NameStep) and 1 (DateOfBirthStep)
+  const [currentStep, setCurrentStep] = useState(0); // Start at step 0 to collect all data
   const [formData, setFormData] = useState<StoryIntakeData>({
     profile: { 
       name: user?.name || '', // Pre-populate with name from authenticated user
@@ -37,7 +38,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
   };
 
   const handleBack = () => {
-    if (currentStep > 2) { // Changed from 1 to 2 since we start at step 2
+    if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
   };
@@ -53,17 +54,21 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
         throw new Error('User not authenticated. Please log in to get recommendations.');
       }
       
+      // Use formData instead of data parameter to ensure all updates are included
+      const finalData = { ...formData, ...data };
+      
       // Debug: Log the data being sent
-      console.log('🔍 DEBUG: Sending intake data:', JSON.stringify(data, null, 2));
+      console.log('🔍 DEBUG: Sending intake data:', JSON.stringify(finalData, null, 2));
       
       // User is already authenticated, so we can call the /recommend endpoint directly
-      const response = await fetch('https://api.decode-app.nl/recommend', {
+      const apiUrl = getApiConfig().baseUrl;
+      const response = await fetch(`${apiUrl}/recommend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`, // Use authenticated user's token
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(finalData),
       });
 
       if (!response.ok) {
@@ -74,7 +79,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
       
       // Add the intake_id to the data for tracking
       const enhancedData = {
-        ...data,
+        ...finalData,
         intake_id: result.data_collection?.intake_id,
         recommendations: result.interventions
       };
@@ -84,13 +89,31 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
     } catch (error) {
       console.error('❌ Error completing intake:', error);
       // Still pass the data to parent even if API call fails
-      onComplete(data);
+      onComplete(finalData);
     }
   };
 
   const renderStepComponent = () => {
     switch (currentStep) {
-      case 2: // LastPeriodStep (was case 2, now case 2)
+      case 0: // NameStep
+        return (
+          <NameStep
+            data={formData}
+            onUpdate={handleUpdate}
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        );
+      case 1: // DateOfBirthStep
+        return (
+          <DateOfBirthStep
+            data={formData}
+            onUpdate={handleUpdate}
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        );
+      case 2: // LastPeriodStep
         return (
           <LastPeriodStep
             data={formData}

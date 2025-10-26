@@ -34,9 +34,10 @@ export const ConsentStep: React.FC<ConsentStepProps> = ({
     const updatedData = {
       ...data,
       consent,
-      // anonymous field removed - all users are authenticated
     };
+    // Update the form data before completing
     onUpdate(updatedData);
+    // Use the latest updatedData with all form changes
     onComplete(updatedData);
   };
 
