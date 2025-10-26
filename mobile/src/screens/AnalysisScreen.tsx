@@ -150,7 +150,7 @@ export default function AnalysisScreen({
 
         {/* Weekly Summary */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Getting Started</Text>
+          <Text style={styles.cardTitle}>Your Progress</Text>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Today's Mood</Text>
@@ -170,31 +170,14 @@ export default function AnalysisScreen({
           </View>
         </View>
 
-        {/* AI Insights */}
+        {/* AI Insights - Coming Soon */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Personal insights from your Nutritionist</Text>
-          <View style={styles.insightItem}>
-            <Text style={styles.insightIcon}>💡</Text>
-            <Text style={styles.insightText}>
-              Your mood improves by 15% when you complete all habits
-            </Text>
-          </View>
-          <View style={styles.insightItem}>
-            <Text style={styles.insightIcon}>💡</Text>
-            <Text style={styles.insightText}>
-              Bloating symptoms decrease by 40% during Mediterranean diet weeks
-            </Text>
-          </View>
-          <View style={styles.insightItem}>
-            <Text style={styles.insightIcon}>💡</Text>
-            <Text style={styles.insightText}>
-              You're most consistent with 'Eat with your cycle' habit
-            </Text>
-          </View>
-          <View style={styles.insightItem}>
-            <Text style={styles.insightIcon}>💡</Text>
-            <Text style={styles.insightText}>
-              Mood dips typically occur 2-3 days before your period
+          <View style={styles.comingSoonContainer}>
+            <Text style={styles.comingSoonIcon}>🚧</Text>
+            <Text style={styles.comingSoonTitle}>Coming Soon</Text>
+            <Text style={styles.comingSoonText}>
+              AI-powered insights and analytics based on your tracking patterns are coming soon!
             </Text>
           </View>
         </View>
@@ -550,6 +533,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
     lineHeight: 20,
+  },
+  comingSoonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  comingSoonIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  comingSoonTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  comingSoonText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
   },
   customInterventionCard: {
     backgroundColor: '#F0F9FF',
