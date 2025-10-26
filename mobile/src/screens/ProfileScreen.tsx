@@ -19,24 +19,24 @@ interface ProfileScreenProps {
 }
 
 export default function ProfileScreen({ route }: ProfileScreenProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, session } = useAuth();
   const intakeData = route?.params?.intakeData;
   const [interventionPeriods, setInterventionPeriods] = useState<any[]>([]);
   const [loadingInterventions, setLoadingInterventions] = useState(true);
 
   useEffect(() => {
     loadInterventionPeriods();
-  }, [user]);
+  }, [user, session]);
 
   const loadInterventionPeriods = async () => {
-    if (!user?.id) {
+    if (!user?.id || !session?.access_token) {
       setLoadingInterventions(false);
       return;
     }
 
     try {
       setLoadingInterventions(true);
-      const result = await interventionPeriodService.getUserInterventionPeriods(user.id);
+      const result = await interventionPeriodService.getUserInterventionPeriods(session.access_token);
       
       if (result.success) {
         setInterventionPeriods(result.periods || []);
