@@ -19,7 +19,7 @@ interface ProfileScreenProps {
 }
 
 export default function ProfileScreen({ route }: ProfileScreenProps) {
-  const { user, logout, session, refreshUser } = useAuth();
+  const { user, logout, session } = useAuth();
   const intakeData = route?.params?.intakeData;
   const [interventionPeriods, setInterventionPeriods] = useState<any[]>([]);
   const [loadingInterventions, setLoadingInterventions] = useState(true);
@@ -27,13 +27,6 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
   useEffect(() => {
     loadInterventionPeriods();
   }, [user, session]);
-  
-  // Refresh session if available
-  useEffect(() => {
-    if (user && session) {
-      refreshUser().catch(err => console.error('Failed to refresh user:', err));
-    }
-  }, []);
 
   const loadInterventionPeriods = async () => {
     if (!user?.id || !session?.access_token) {

@@ -103,6 +103,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadStoredAuth();
   }, []);
 
+  // Setup automatic token refresh every 50 minutes (tokens expire after 60 minutes)
+  useEffect(() => {
+    if (state.isAuthenticated && state.session) {
+      const refreshInterval = setInterval(async () => {
+        try {
+          console.log('🔄 Auto-refreshing session...');
+          await refreshUser();
+        } catch (error) {
+          console.error('Failed to auto-refresh session:', error);
+        }
+      }, 50 * 60 * 1000); // Every 50 minutes
+
+      return () => clearInterval(refreshInterval);
+    }
+  }, [state.isAuthenticated, state.session]);
+
+  // Refresh token on component mount if session exists
+  useEffect(() => {
+    if (state.isAuthenticated && state.session && state.user) {
+      refreshUser().catch(err => console.error('Failed to refresh user on mount:', err));
+    }
+  }, [state.isAuthenticated]);
+
   const loadStoredAuth = async () => {
     try {
       const [storedUser, storedSession] = await Promise.all([
