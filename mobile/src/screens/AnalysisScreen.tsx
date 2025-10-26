@@ -289,37 +289,6 @@ export default function AnalysisScreen({
             )}
           </View>
         )}
-
-
-        {/* Quick Actions */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Quick Actions</Text>
-          
-          <TouchableOpacity style={styles.actionButton} onPress={onNavigateToChat}>
-            <Text style={styles.actionIcon}>💬</Text>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Ask a Question</Text>
-              <Text style={styles.actionDescription}>Get instant nutrition advice</Text>
-            </View>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionIcon}>📊</Text>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>View Progress</Text>
-              <Text style={styles.actionDescription}>Track your habit completion</Text>
-            </View>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionIcon}>📝</Text>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Update Profile</Text>
-              <Text style={styles.actionDescription}>Refresh your health information</Text>
-            </View>
-          </TouchableOpacity>
-          
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
