@@ -19,7 +19,7 @@ interface ProfileScreenProps {
 }
 
 export default function ProfileScreen({ route }: ProfileScreenProps) {
-  const { user, logout, session } = useAuth();
+  const { user, logout, session, refreshUser } = useAuth();
   const intakeData = route?.params?.intakeData;
   const [interventionPeriods, setInterventionPeriods] = useState<any[]>([]);
   const [loadingInterventions, setLoadingInterventions] = useState(true);
@@ -27,25 +27,41 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
   useEffect(() => {
     loadInterventionPeriods();
   }, [user, session]);
+  
+  // Refresh session if available
+  useEffect(() => {
+    if (user && session) {
+      refreshUser().catch(err => console.error('Failed to refresh user:', err));
+    }
+  }, []);
 
   const loadInterventionPeriods = async () => {
     if (!user?.id || !session?.access_token) {
+      console.error('No user or session found');
       setLoadingInterventions(false);
       return;
     }
 
     try {
       setLoadingInterventions(true);
+      console.log('Loading intervention periods with access token:', session.access_token.substring(0, 20) + '...');
+      
       const result = await interventionPeriodService.getUserInterventionPeriods(session.access_token);
       
       if (result.success) {
+        console.log('✅ Successfully loaded intervention periods:', result.periods?.length || 0);
         setInterventionPeriods(result.periods || []);
       } else {
-        console.error('Failed to load intervention periods:', result.error);
+        console.error('❌ Failed to load intervention periods:', result.error);
         setInterventionPeriods([]);
       }
-    } catch (error) {
-      console.error('Error loading intervention periods:', error);
+    } catch (error: any) {
+      console.error('❌ Error loading intervention periods:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       setInterventionPeriods([]);
     } finally {
       setLoadingInterventions(false);
