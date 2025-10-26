@@ -18,11 +18,11 @@ interface StoryIntakeScreenProps {
 
 export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps) {
   const { user, session } = useAuth();
-  const [currentStep, setCurrentStep] = useState(0); // Start at step 0 to collect all data
+  const [currentStep, setCurrentStep] = useState(2); // Start at LastPeriodStep - skip Name and Age (already collected during registration)
   const [formData, setFormData] = useState<StoryIntakeData>({
     profile: { 
       name: user?.name || '', // Pre-populate with name from authenticated user
-      age: 25 // Default age, will be updated during intake
+      age: user?.age || 25 // Use age from user profile if available, otherwise default to 25
     },
     lastPeriod: { date: '', hasPeriod: true, cycleLength: undefined },
     symptoms: { selected: [], additional: '' },
@@ -38,7 +38,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
   };
 
   const handleBack = () => {
-    if (currentStep > 0) {
+    if (currentStep > 2) { // Can't go back beyond LastPeriodStep (step 2)
       setCurrentStep(currentStep - 1);
     }
   };
@@ -95,24 +95,6 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
 
   const renderStepComponent = () => {
     switch (currentStep) {
-      case 0: // NameStep
-        return (
-          <NameStep
-            data={formData}
-            onUpdate={handleUpdate}
-            onNext={handleNext}
-            onBack={handleBack}
-          />
-        );
-      case 1: // DateOfBirthStep
-        return (
-          <DateOfBirthStep
-            data={formData}
-            onUpdate={handleUpdate}
-            onNext={handleNext}
-            onBack={handleBack}
-          />
-        );
       case 2: // LastPeriodStep
         return (
           <LastPeriodStep
