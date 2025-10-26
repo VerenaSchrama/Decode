@@ -15,7 +15,7 @@ class InterventionPeriod(BaseModel):
     user_id: str = Field(..., description="User ID from profiles table")
     intake_id: str = Field(..., description="Reference to intake that generated this intervention")
     intervention_name: str = Field(..., description="Name of the intervention")
-    intervention_id: Optional[str] = Field(None, description="ID from InterventionsBASE table")
+    intervention_id: Optional[int] = Field(None, description="ID from InterventionsBASE table (integer)")
     selected_habits: List[str] = Field(default_factory=list, description="Habits selected by user")
     start_date: datetime = Field(default_factory=datetime.now, description="When intervention started")
     end_date: Optional[datetime] = Field(None, description="Planned end date (maps to 'end_date' in DB)")
@@ -39,7 +39,7 @@ class InterventionPeriodService:
         intake_id: str, 
         intervention_name: str,
         selected_habits: List[str],
-        intervention_id: Optional[str] = None,
+        intervention_id: Optional[int] = None,
         planned_duration_days: int = 30,
         cycle_phase: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -53,31 +53,19 @@ class InterventionPeriodService:
             "id": str(uuid.uuid4()),
             "user_id": user_id,
             "intake_id": intake_id,
-            "intervention_name": intervention_name,  # Now properly mapped to DB column
-            "selected_habits": selected_habits,  # Now properly mapped to JSONB column
+            "intervention_name": intervention_name,
+            "intervention_id": intervention_id,
+            "selected_habits": selected_habits,
             "start_date": datetime.now().isoformat(),
-            "end_date": end_date_dt.isoformat(),  # Maps to 'end_date' in DB (not 'planned_end_date')
-            "planned_duration_days": planned_duration_days,  # Additional field for tracking
+            "end_date": end_date_dt.isoformat(),
+            "planned_duration_days": planned_duration_days,
             "actual_end_date": None,
             "status": "active",
-            "cycle_phase": cycle_phase,  # Maps to 'cycle_phase' in DB (not 'cycle_phase_at_start')
+            "cycle_phase": cycle_phase,
             "notes": None,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
-        
-        # Only add intervention_id if it's a valid UUID (not an integer)
-        if intervention_id:
-            # Check if it's a string UUID (expected) or an integer (needs conversion)
-            if isinstance(intervention_id, (int, str)):
-                # Try to convert to string if it's an integer
-                intervention_id_str = str(intervention_id) if isinstance(intervention_id, int) else intervention_id
-                # Only add if it looks like a UUID or is numeric
-                if len(intervention_id_str) > 1:  # Basic validation
-                    # For now, skip intervention_id if it's an integer from InterventionsBASE
-                    # The integer ID doesn't match the UUID expected by the foreign key
-                    print(f"⚠️ Skipping intervention_id (not a UUID): {intervention_id}")
-                    # Don't set intervention_id in period_data
         
         try:
             # Insert into intervention_periods table
