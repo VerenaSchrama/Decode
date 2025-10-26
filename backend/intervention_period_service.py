@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 import uuid
 
 class InterventionPeriod(BaseModel):
-    """Model for tracking intervention periods"""
+    """Model for tracking intervention periods - aligned with Supabase schema"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str = Field(..., description="User ID from profiles table")
     intake_id: str = Field(..., description="Reference to intake that generated this intervention")
@@ -18,10 +18,10 @@ class InterventionPeriod(BaseModel):
     intervention_id: Optional[str] = Field(None, description="ID from InterventionsBASE table")
     selected_habits: List[str] = Field(default_factory=list, description="Habits selected by user")
     start_date: datetime = Field(default_factory=datetime.now, description="When intervention started")
-    planned_end_date: Optional[datetime] = Field(None, description="Planned end date")
+    end_date: Optional[datetime] = Field(None, description="Planned end date (maps to 'end_date' in DB)")
     actual_end_date: Optional[datetime] = Field(None, description="Actual completion date")
     status: str = Field(default="active", description="active, completed, paused, abandoned")
-    # cycle_phase_at_start removed - column doesn't exist in Supabase table
+    cycle_phase: Optional[str] = Field(None, description="Cycle phase when started (maps to 'cycle_phase' in DB)")
     notes: Optional[str] = Field(None, description="User notes about the intervention")
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
@@ -40,26 +40,28 @@ class InterventionPeriodService:
         intervention_name: str,
         selected_habits: List[str],
         intervention_id: Optional[str] = None,
-        planned_duration_days: int = 30
+        planned_duration_days: int = 30,
+        cycle_phase: Optional[str] = None
     ) -> Dict[str, Any]:
         """Start tracking a new intervention period"""
         
         # Calculate planned end date
-        planned_end_date = datetime.now() + timedelta(days=planned_duration_days)
+        end_date_dt = datetime.now() + timedelta(days=planned_duration_days)
         
-        # Create intervention period record
+        # Create intervention period record - aligned with Supabase schema
         period_data = {
             "id": str(uuid.uuid4()),
-            "user_id": user_id,  # This matches the actual column name in the table
+            "user_id": user_id,
             "intake_id": intake_id,
-            "intervention_name": intervention_name,
+            "intervention_name": intervention_name,  # Now properly mapped to DB column
             "intervention_id": intervention_id,
-            "selected_habits": selected_habits,
+            "selected_habits": selected_habits,  # Now properly mapped to JSONB column
             "start_date": datetime.now().isoformat(),
-            "planned_end_date": planned_end_date.isoformat(),
+            "end_date": end_date_dt.isoformat(),  # Maps to 'end_date' in DB (not 'planned_end_date')
+            "planned_duration_days": planned_duration_days,  # Additional field for tracking
             "actual_end_date": None,
             "status": "active",
-            # cycle_phase_at_start removed - column doesn't exist in Supabase table
+            "cycle_phase": cycle_phase,  # Maps to 'cycle_phase' in DB (not 'cycle_phase_at_start')
             "notes": None,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
