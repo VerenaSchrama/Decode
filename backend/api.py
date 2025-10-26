@@ -1453,7 +1453,6 @@ async def start_intervention_period(
         selected_habits = request.get("selected_habits", [])
         intervention_id = request.get("intervention_id")
         planned_duration_days = request.get("planned_duration_days", 30)
-        cycle_phase = request.get("cycle_phase")
         
         if not intake_id or not intervention_name:
             raise HTTPException(status_code=400, detail="intake_id and intervention_name are required")
@@ -1465,8 +1464,7 @@ async def start_intervention_period(
             intervention_name=intervention_name,
             selected_habits=selected_habits,
             intervention_id=intervention_id,
-            planned_duration_days=planned_duration_days,
-            cycle_phase=cycle_phase
+            planned_duration_days=planned_duration_days
         )
         
         if result["success"]:
@@ -1792,9 +1790,8 @@ async def get_user_session_data(user_id: str):
                     "id": period['intervention_id'],
                     "name": period['intervention_name'],
                     "start_date": period['start_date'],
-                    "planned_end_date": period['planned_end_date'],
-                    "cycle_phase_at_start": period['cycle_phase_at_start'],
-                    "completion_percentage": period['completion_percentage']
+                    "planned_end_date": period['planned_end_date']
+                    # Note: cycle_phase_at_start and completion_percentage removed - columns don't exist in Supabase table
                 }
                 session_data["selected_habits"] = period.get('selected_habits', [])
         except Exception as e:

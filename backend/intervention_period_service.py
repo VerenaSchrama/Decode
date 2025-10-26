@@ -21,7 +21,7 @@ class InterventionPeriod(BaseModel):
     planned_end_date: Optional[datetime] = Field(None, description="Planned end date")
     actual_end_date: Optional[datetime] = Field(None, description="Actual completion date")
     status: str = Field(default="active", description="active, completed, paused, abandoned")
-    cycle_phase_at_start: Optional[str] = Field(None, description="Cycle phase when started")
+    # cycle_phase_at_start removed - column doesn't exist in Supabase table
     notes: Optional[str] = Field(None, description="User notes about the intervention")
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
@@ -40,8 +40,7 @@ class InterventionPeriodService:
         intervention_name: str,
         selected_habits: List[str],
         intervention_id: Optional[str] = None,
-        planned_duration_days: int = 30,
-        cycle_phase: Optional[str] = None
+        planned_duration_days: int = 30
     ) -> Dict[str, Any]:
         """Start tracking a new intervention period"""
         
@@ -60,7 +59,7 @@ class InterventionPeriodService:
             "planned_end_date": planned_end_date.isoformat(),
             "actual_end_date": None,
             "status": "active",
-            "cycle_phase_at_start": cycle_phase,
+            # cycle_phase_at_start removed - column doesn't exist in Supabase table
             "notes": None,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
