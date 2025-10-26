@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import { useAuth } from '../contexts/AuthContext';
 import { interventionPeriodService } from '../services/interventionPeriodService';
+import { getApiConfig } from '../config/environment';
 import { RouteProp } from '@react-navigation/native';
 
 interface ProfileScreenProps {
@@ -27,6 +28,67 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
   useEffect(() => {
     loadInterventionPeriods();
   }, [user, session]);
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Call delete account API
+              await deleteUserAccount();
+              // Logout will be handled after account deletion
+              await logout();
+            } catch (error) {
+              console.error('Error deleting account:', error);
+              Alert.alert('Error', 'Failed to delete account. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const deleteUserAccount = async () => {
+    if (!session?.access_token) {
+      throw new Error('No session token available');
+    }
+    
+    const apiUrl = getApiConfig().baseUrl;
+    
+    try {
+      const response = await fetch(`${apiUrl}/user/delete-account`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete account');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      throw error;
+    }
+  };
+
+  const handleChangePassword = () => {
+    // TODO: Implement change password
+    Alert.alert('Change Password', 'This feature will be available soon.');
+  };
 
   const loadInterventionPeriods = async () => {
     if (!user?.id || !session?.access_token) {
@@ -115,15 +177,30 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
         keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <Ionicons name="person" size={40} color={colors.primary} />
+        {/* You Section */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>You</Text>
           </View>
-          <Text style={styles.name}>
-            {user?.name || 'User'}
-          </Text>
-          <Text style={styles.subtitle}>Health Journey Profile</Text>
+          
+          <View style={styles.profileInfoItem}>
+            <Text style={styles.infoLabel}>Name</Text>
+            <Text style={styles.infoValue}>{user?.name || 'Not set'}</Text>
+          </View>
+          
+          <View style={styles.profileInfoItem}>
+            <Text style={styles.infoLabel}>Email</Text>
+            <Text style={styles.infoValue}>{user?.email || 'Not set'}</Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.changePasswordButton}
+            onPress={handleChangePassword}
+          >
+            <Ionicons name="key" size={20} color={colors.primary} />
+            <Text style={styles.changePasswordText}>Change Password</Text>
+            <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
+          </TouchableOpacity>
         </View>
 
         {/* Cycle Phase Card */}
@@ -230,34 +307,6 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
           )}
         </View>
 
-        {/* Settings Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="settings" size={20} color={colors.primary} />
-            <Text style={styles.cardTitle}>Settings</Text>
-          </View>
-          <TouchableOpacity style={styles.settingItem}>
-            <Ionicons name="notifications" size={20} color="#6B7280" />
-            <Text style={styles.settingText}>Notifications</Text>
-            <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.settingItem}>
-            <Ionicons name="shield-checkmark" size={20} color="#6B7280" />
-            <Text style={styles.settingText}>Privacy & Security</Text>
-            <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.settingItem}>
-            <Ionicons name="help-circle" size={20} color="#6B7280" />
-            <Text style={styles.settingText}>Help & Support</Text>
-            <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.settingItem}>
-            <Ionicons name="information-circle" size={20} color="#6B7280" />
-            <Text style={styles.settingText}>About</Text>
-            <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
-          </TouchableOpacity>
-        </View>
-
         {/* Sign Out Button */}
         <TouchableOpacity 
           style={styles.logoutButton} 
@@ -267,6 +316,17 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
         >
           <Ionicons name="log-out" size={20} color="#EF4444" />
           <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+
+        {/* Delete Account Button */}
+        <TouchableOpacity 
+          style={styles.deleteAccountButton} 
+          onPress={handleDeleteAccount}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="trash" size={20} color="#EF4444" />
+          <Text style={styles.deleteAccountText}>Delete Account</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -456,11 +516,55 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingVertical: 16,
-    marginBottom: 20,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#FEE2E2',
   },
   logoutText: {
+    fontSize: 16,
+    color: '#EF4444',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  profileInfoItem: {
+    marginBottom: 12,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  changePasswordButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    marginTop: 8,
+  },
+  changePasswordText: {
+    fontSize: 16,
+    color: '#1F2937',
+    marginLeft: 12,
+    flex: 1,
+  },
+  deleteAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  deleteAccountText: {
     fontSize: 16,
     color: '#EF4444',
     marginLeft: 8,

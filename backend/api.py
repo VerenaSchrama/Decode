@@ -2526,6 +2526,104 @@ async def verify_token(authorization: str = Header(None)):
     access_token = authorization.split(" ")[1]
     return await auth_service.verify_token(access_token)
 
+@app.delete("/user/delete-account")
+async def delete_user_account(authorization: str = Header(None)):
+    """
+    Delete user account and all associated data
+    
+    Args:
+        authorization: Authorization header with Bearer token
+        
+    Returns:
+        Success status
+    """
+    try:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required"
+            )
+        
+        access_token = authorization.split(" ")[1]
+        user_info = await auth_service.verify_token(access_token)
+        
+        if not user_info or not user_info.get("success"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token"
+            )
+        
+        user_id = user_info["user_id"]
+        print(f"🗑️ Deleting account for user: {user_id}")
+        
+        # Use service role client to bypass RLS
+        from models import supabase_client
+        
+        # Delete all user data (via CASCADE from profile deletion)
+        # or delete individual records if needed
+        
+        try:
+            # Delete from auth.users (this will cascade to profiles if configured)
+            supabase_client.client.auth.admin.delete_user(user_id)
+            
+            print(f"✅ Successfully deleted account for user: {user_id}")
+            return {
+                "success": True,
+                "message": "Account deleted successfully"
+            }
+        except Exception as e:
+            print(f"❌ Error deleting user from auth: {e}")
+            # Try manual deletion of related records
+            try:
+                # Delete from profiles
+                supabase_client.client.table('profiles')\
+                    .delete()\
+                    .eq('user_id', user_id)\
+                    .execute()
+                
+                # Delete from other tables (cascade might handle some)
+                tables_to_clean = [
+                    'intakes',
+                    'intervention_periods',
+                    'user_habits',
+                    'daily_habit_entries',
+                    'daily_summaries',
+                    'daily_moods',
+                    'chat_messages',
+                    'cycle_phases'
+                ]
+                
+                for table_name in tables_to_clean:
+                    try:
+                        supabase_client.client.table(table_name)\
+                            .delete()\
+                            .eq('user_id', user_id)\
+                            .execute()
+                        print(f"✅ Deleted records from {table_name}")
+                    except Exception as table_error:
+                        print(f"⚠️ Could not delete from {table_name}: {table_error}")
+                
+                print(f"✅ Successfully deleted account data for user: {user_id}")
+                return {
+                    "success": True,
+                    "message": "Account deleted successfully"
+                }
+            except Exception as cleanup_error:
+                print(f"❌ Error during manual cleanup: {cleanup_error}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error deleting account: {str(cleanup_error)}"
+                )
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in delete account endpoint: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
 @app.on_event("startup")
 async def startup_event():
     """Background tasks on app startup"""
