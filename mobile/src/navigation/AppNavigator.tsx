@@ -101,9 +101,14 @@ export default function AppNavigator({
     }
     
     // Start tracking intervention period
+    // Debug: Log intake data to see what we have
+    console.log('🔍 DEBUG: intakeData:', JSON.stringify(intakeData, null, 2));
+    console.log('🔍 DEBUG: intakeData?.intake_id:', intakeData?.intake_id);
+    
     // Check if intake_id is available
     if (!intakeData?.intake_id) {
       console.error('❌ No intake_id available - cannot start intervention period');
+      console.error('❌ Full intakeData object:', intakeData);
       Alert.alert(
         'Missing Data',
         'Unable to start intervention tracking. Please complete the intake first.',
