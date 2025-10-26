@@ -1,6 +1,4 @@
 import axios from 'axios';
-
-// API configuration
 import { getApiConfig } from '../config/environment';
 
 export const API_BASE_URL = getApiConfig().baseUrl; // Local development server
@@ -12,6 +10,63 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Global variable to store refresh callback (set by AuthContext)
+let refreshTokenCallback: ((refreshToken: string) => Promise<any>) | null = null;
+
+export const setRefreshTokenCallback = (callback: (refreshToken: string) => Promise<any>) => {
+  refreshTokenCallback = callback;
+};
+
+// Add response interceptor for automatic token refresh
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If error is 401 and we haven't tried refreshing yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        // Get the refresh token from AsyncStorage
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const storedSession = await AsyncStorage.getItem('@auth_session');
+        
+        if (storedSession && refreshTokenCallback) {
+          const session = JSON.parse(storedSession);
+          
+          if (session.refresh_token) {
+            console.log('🔄 Token expired, refreshing...');
+            
+            // Call refresh callback
+            const newSession = await refreshTokenCallback(session.refresh_token);
+            
+            // Update the stored session
+            await AsyncStorage.setItem('@auth_session', JSON.stringify({
+              ...newSession,
+              created_at: Date.now(),
+            }));
+
+            // Update the authorization header for the retry
+            originalRequest.headers.Authorization = `Bearer ${newSession.access_token}`;
+            
+            console.log('✅ Token refreshed successfully, retrying request');
+            
+            // Retry the original request
+            return api(originalRequest);
+          }
+        }
+      } catch (refreshError) {
+        console.error('❌ Token refresh failed:', refreshError);
+        // If refresh fails, redirect to login screen
+        // This would require navigation context, so we'll just reject the error
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 // API endpoints
 export const endpoints = {

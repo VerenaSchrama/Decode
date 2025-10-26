@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthState, User, AuthSession, LoginRequest, RegisterRequest, AuthError } from '../types/Auth';
 import authService from '../services/authService';
+import { setRefreshTokenCallback } from '../services/api';
 
 // Auth Actions
 type AuthAction =
@@ -101,6 +102,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Load stored auth data on app start
   useEffect(() => {
     loadStoredAuth();
+  }, []);
+
+  // Register refresh token callback with API interceptor
+  useEffect(() => {
+    const refreshCallback = async (refreshToken: string) => {
+      try {
+        const newSession = await authService.refreshToken(refreshToken);
+        return newSession;
+      } catch (error) {
+        console.error('Error in refresh callback:', error);
+        throw error;
+      }
+    };
+    
+    setRefreshTokenCallback(refreshCallback);
   }, []);
 
   // Setup automatic token refresh every 50 minutes (tokens expire after 60 minutes)
