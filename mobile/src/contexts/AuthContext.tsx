@@ -294,6 +294,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       dispatch({ type: 'AUTH_LOADING', payload: true });
       
+      // Try to refresh the token first
+      if (state.session.refresh_token) {
+        try {
+          console.log('🔄 Attempting to refresh token...');
+          const newSession = await authService.refreshToken(state.session.refresh_token);
+          
+          // Update session with new tokens
+          const updatedSession = {
+            ...newSession,
+            created_at: Date.now(),
+          };
+          
+          await storeAuth(state.user, updatedSession);
+          
+          dispatch({
+            type: 'AUTH_SUCCESS',
+            payload: { user: state.user, session: updatedSession },
+          });
+          console.log('✅ Token refreshed successfully');
+          return;
+        } catch (refreshError) {
+          console.warn('⚠️ Token refresh failed, trying to get user profile with current token:', refreshError);
+          // Fall through to try getUserProfile
+        }
+      }
+      
+      // Try to get user profile with current token
       const user = await authService.getUserProfile(state.user.id, state.session.access_token);
       
       dispatch({
@@ -301,7 +328,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         payload: { user, session: state.session },
       });
     } catch (error) {
-      console.error('Error refreshing user:', error);
+      console.error('❌ Error refreshing user:', error);
       // Don't dispatch error for refresh - just keep current state
     } finally {
       dispatch({ type: 'AUTH_LOADING', payload: false });

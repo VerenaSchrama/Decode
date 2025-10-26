@@ -389,6 +389,38 @@ class AuthService:
                 detail=f"Failed to update profile: {str(e)}"
             )
     
+    async def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
+        """
+        Refresh access token using refresh token
+        
+        Args:
+            refresh_token: User's refresh token
+            
+        Returns:
+            New session with refreshed tokens
+        """
+        try:
+            # Use Supabase's refresh session method
+            session = self.client.auth.refresh_session(refresh_token)
+            
+            if not session.session:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token refresh failed"
+                )
+            
+            return {
+                "access_token": session.session.access_token,
+                "refresh_token": session.session.refresh_token,
+                "expires_at": session.session.expires_at
+            }
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Token refresh failed: {str(e)}"
+            )
+    
     async def verify_token(self, access_token: str) -> Dict[str, Any]:
         """
         Verify user's access token
