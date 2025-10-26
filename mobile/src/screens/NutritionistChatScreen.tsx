@@ -146,9 +146,11 @@ export default function NutritionistChatScreen({
         context_used: data.context_used,
       };
 
-      const newMessages = [...messages, aiMessage];
-      setMessages(newMessages);
-      saveMessagesToLocalStorage(newMessages);
+      setMessages(prevMessages => {
+        const updatedMessages = [...prevMessages, aiMessage];
+        saveMessagesToLocalStorage(updatedMessages);
+        return updatedMessages;
+      });
       showToast('Message sent successfully!', 'success');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -162,9 +164,11 @@ export default function NutritionistChatScreen({
         is_user: false,
         timestamp: new Date().toISOString(),
       };
-      const newMessages = [...messages, errorMessage];
-      setMessages(newMessages);
-      saveMessagesToLocalStorage(newMessages);
+      setMessages(prevMessages => {
+        const updatedMessages = [...prevMessages, errorMessage];
+        saveMessagesToLocalStorage(updatedMessages);
+        return updatedMessages;
+      });
     } finally {
       setIsLoading(false);
     }
