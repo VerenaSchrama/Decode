@@ -101,15 +101,28 @@ export default function AppNavigator({
     }
     
     // Start tracking intervention period
+    // Check if intake_id is available
+    if (!intakeData?.intake_id) {
+      console.error('❌ No intake_id available - cannot start intervention period');
+      Alert.alert(
+        'Missing Data',
+        'Unable to start intervention tracking. Please complete the intake first.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     try {
       const startRequest = {
-        intake_id: intakeData?.intake_id || 'temp-intake-id',
+        intake_id: intakeData.intake_id,
         intervention_name: intervention.name,
         selected_habits: interventionHabits,
         intervention_id: intervention.id,
         planned_duration_days: periodData.durationDays,
         cycle_phase: cyclePhase
       };
+      
+      console.log('📤 Starting intervention period with request:', startRequest);
       
       const result = await interventionPeriodService.startInterventionPeriod(
         startRequest,
