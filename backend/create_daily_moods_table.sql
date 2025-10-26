@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.daily_moods (
     notes TEXT,
     symptoms TEXT[],  -- Array of symptoms
     cycle_phase VARCHAR(50),
+    habit_entry_ids UUID[],  -- Array of daily_habit_entries IDs tracked this day
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
     
@@ -23,6 +24,7 @@ COMMENT ON COLUMN public.daily_moods.entry_date IS 'Date of the mood entry';
 COMMENT ON COLUMN public.daily_moods.mood IS 'Mood rating (1-5 scale)';
 COMMENT ON COLUMN public.daily_moods.symptoms IS 'Array of symptoms experienced';
 COMMENT ON COLUMN public.daily_moods.cycle_phase IS 'Menstrual cycle phase at time of entry';
+COMMENT ON COLUMN public.daily_moods.habit_entry_ids IS 'Array of daily_habit_entries IDs tracked this day';
 
 -- Create index for efficient queries by user and date
 CREATE INDEX IF NOT EXISTS idx_daily_moods_user_date 

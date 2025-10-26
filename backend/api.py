@@ -608,13 +608,14 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             
             try:
                 result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
-                entry_ids.append(result.data[0]['id'])
-                print(f"DEBUG: Created daily habit entry: {result.data[0]['id']}")
+                entry_id = result.data[0]['id']
+                entry_ids.append(entry_id)
+                print(f"DEBUG: Created daily habit entry: {entry_id}")
             except Exception as e:
                 print(f"DEBUG: Could not create daily habit entry: {e}")
                 # Continue with other habits
         
-        # Create daily mood entry (stored separately from habit entries)
+        # Create daily mood entry (stored separately from habit entries, linked via habit_entry_ids)
         if mood:
             try:
                 daily_mood_data = {
@@ -623,7 +624,8 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                     'mood': mood.get('mood'),
                     'notes': mood.get('notes', ''),
                     'symptoms': mood.get('symptoms', []),
-                    'cycle_phase': cycle_phase
+                    'cycle_phase': cycle_phase,
+                    'habit_entry_ids': entry_ids  # Store array of daily_habit_entries IDs
                 }
                 # Use upsert to handle duplicate entries for the same day
                 mood_result = supabase_client.client.table('daily_moods').upsert(
