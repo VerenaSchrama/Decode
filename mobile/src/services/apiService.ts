@@ -295,6 +295,34 @@ class ApiService {
     );
   }
 
+  // ===== CYCLE PHASE MANAGEMENT =====
+
+  /**
+   * Get current cycle phase
+   */
+  async getCyclePhase(): Promise<any> {
+    return this.makeRequest<any>('/user/cycle-phase');
+  }
+
+  /**
+   * Update cycle phase
+   */
+  async updateCyclePhase(request: { last_period_date: string; cycle_length: number; auto_recalculate?: boolean }): Promise<any> {
+    return this.makeRequest<any>('/user/cycle-phase', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  /**
+   * Recalculate cycle phase
+   */
+  async recalculateCyclePhase(): Promise<any> {
+    return this.makeRequest<any>('/user/cycle-phase/recalculate', {
+      method: 'POST',
+    });
+  }
+
   // ===== HEALTH CHECK =====
 
   /**

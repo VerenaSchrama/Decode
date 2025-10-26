@@ -318,6 +318,21 @@ async def recommend_intervention(user_input: UserInput, authorization: str = Hea
             )
             result["data_collection"] = data_collection_result
             print("✅ Intake completed with authenticated user")
+            
+            # Store cycle phase if period data is available
+            if user_input.lastPeriod and user_input.lastPeriod.hasPeriod and user_input.lastPeriod.date and user_input.lastPeriod.cycleLength:
+                try:
+                    from services.cycle_phase_service import get_cycle_phase_service
+                    cycle_service = get_cycle_phase_service()
+                    cycle_result = await cycle_service.update_cycle_phase(
+                        user_id,
+                        user_input.lastPeriod.date,
+                        user_input.lastPeriod.cycleLength
+                    )
+                    if cycle_result.get('success'):
+                        print(f"✅ Stored cycle phase: {cycle_result.get('current_phase')}")
+                except Exception as e:
+                    print(f"⚠️ Failed to store cycle phase: {e}")
         except HTTPException:
             raise
         except Exception as e:
@@ -1282,25 +1297,22 @@ async def send_chat_message(request: ChatRequest, authorization: str = Header(No
         final_intervention = current_intervention_data or request.current_intervention
         final_selected_habits = user_habits_list if user_habits_list else (request.selected_habits or [])
         
-        # Calculate current cycle phase if intake data includes period info
+        # Fetch current cycle phase from database
         cycle_phase_info = None
-        if final_intake_data and final_intake_data.get('lastPeriod'):
-            last_period = final_intake_data['lastPeriod']
-            if last_period.get('hasPeriod') and last_period.get('date') and last_period.get('cycleLength'):
-                try:
-                    from utils.cycle_calculator import calculate_cycle_phase
-                    phase_name, days_since_period = calculate_cycle_phase(
-                        last_period['date'],
-                        last_period['cycleLength']
-                    )
-                    cycle_phase_info = {
-                        'phase': phase_name,
-                        'day': days_since_period,
-                        'description': f"You are currently on day {days_since_period} of your cycle in the {phase_name} phase"
-                    }
-                    print(f"Calculated cycle phase: {cycle_phase_info}")
-                except Exception as e:
-                    print(f"Error calculating cycle phase: {e}")
+        try:
+            from services.cycle_phase_service import get_cycle_phase_service
+            cycle_service = get_cycle_phase_service()
+            phase_result = await cycle_service.get_current_phase(user_id)
+            
+            if phase_result.get('success'):
+                cycle_phase_info = {
+                    'phase': phase_result.get('current_phase'),
+                    'day': phase_result.get('days_since_period'),
+                    'description': f"You are currently on day {phase_result.get('days_since_period')} of your cycle in the {phase_result.get('current_phase')} phase"
+                }
+                print(f"Fetched cycle phase from database: {cycle_phase_info}")
+        except Exception as e:
+            print(f"Error fetching cycle phase: {e}")
         
         # Build user context for the chat
         user_context = build_user_context(
@@ -1608,6 +1620,152 @@ async def get_latest_intake_id(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 # ============================================================================
+# CYCLE PHASE MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.get("/user/cycle-phase")
+async def get_user_cycle_phase(authorization: str = Header(None)):
+    """Get current cycle phase for authenticated user"""
+    try:
+        from services.cycle_phase_service import get_cycle_phase_service
+        from auth_service import AuthService
+        
+        # Verify authentication
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Get cycle phase from service
+        cycle_service = get_cycle_phase_service()
+        result = await cycle_service.get_current_phase(user_id)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting cycle phase: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@app.post("/user/cycle-phase")
+async def update_user_cycle_phase(
+    request: dict,
+    authorization: str = Header(None)
+):
+    """Update cycle phase for authenticated user"""
+    try:
+        from services.cycle_phase_service import get_cycle_phase_service
+        from auth_service import AuthService
+        
+        # Verify authentication
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Extract cycle data from request
+        last_period_date = request.get("last_period_date")
+        cycle_length = request.get("cycle_length")
+        auto_recalculate = request.get("auto_recalculate", True)
+        
+        if not last_period_date or not cycle_length:
+            raise HTTPException(status_code=400, detail="last_period_date and cycle_length are required")
+        
+        # Update cycle phase via service
+        cycle_service = get_cycle_phase_service()
+        result = await cycle_service.update_cycle_phase(
+            user_id,
+            last_period_date,
+            cycle_length,
+            auto_recalculate
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error updating cycle phase: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@app.post("/user/cycle-phase/recalculate")
+async def recalculate_user_cycle_phase(authorization: str = Header(None)):
+    """Force recalculation of cycle phase for authenticated user"""
+    try:
+        from services.cycle_phase_service import get_cycle_phase_service
+        from auth_service import AuthService
+        from models import supabase_client
+        
+        # Verify authentication
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Get user's cycle data from cycle_phases or intakes
+        try:
+            result = supabase_client.client.table('cycle_phases')\
+                .select('last_period_date, cycle_length')\
+                .eq('user_id', user_id)\
+                .execute()
+            
+            if result.data and len(result.data) > 0:
+                phase_data = result.data[0]
+                cycle_service = get_cycle_phase_service()
+                result = await cycle_service.update_cycle_phase(
+                    user_id,
+                    phase_data['last_period_date'],
+                    phase_data['cycle_length']
+                )
+                return result
+            else:
+                raise HTTPException(status_code=404, detail="No cycle phase data found for user")
+                
+        except Exception as e:
+            print(f"❌ Error getting cycle data: {e}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error recalculating cycle phase: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+# ============================================================================
 # INTERVENTION PERIOD TRACKING ENDPOINTS
 # ============================================================================
 
@@ -1654,6 +1812,20 @@ async def start_intervention_period(
         
         if not intake_id or not intervention_name:
             raise HTTPException(status_code=400, detail="intake_id and intervention_name are required")
+        
+        # Fetch cycle phase from database if not provided
+        if not cycle_phase:
+            try:
+                from models import supabase_client
+                from services.cycle_phase_service import get_cycle_phase_service
+                cycle_service = get_cycle_phase_service()
+                phase_result = await cycle_service.get_current_phase(user_id)
+                if phase_result.get('success'):
+                    cycle_phase = phase_result.get('current_phase')
+                    print(f"✅ Fetched cycle phase from database: {cycle_phase}")
+            except Exception as e:
+                print(f"⚠️ Failed to fetch cycle phase: {e}")
+                # Continue without cycle_phase
         
         # Start intervention period
         result = intervention_period_service.start_intervention_period(
