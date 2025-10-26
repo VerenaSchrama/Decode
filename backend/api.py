@@ -1042,11 +1042,11 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
                     break
             
             # If no mood in habit entries, use summary mood
-            if not mood_data and summary.get('overall_mood'):
+            if not mood_data and summary.get('mood'):
                 mood_data = {
-                    'mood': summary['overall_mood'],
+                    'mood': summary['mood'],
                     'symptoms': [],
-                    'notes': summary.get('overall_notes', ''),
+                    'notes': summary.get('notes', ''),
                     'date': date
                 }
             
