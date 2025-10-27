@@ -325,7 +325,7 @@ class AuthService:
             return {
                 "success": True,
                 "profile": {
-                    "id": profile['id'],
+                    "id": profile.get('user_id'),  # Use user_id instead of id
                     "name": profile.get('name'),
                     "age": profile.get('age'),
                     "date_of_birth": profile.get('date_of_birth'),

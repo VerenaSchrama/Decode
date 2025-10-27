@@ -38,6 +38,9 @@ class CustomInterventionValidationResponse(BaseModel):
     scientific_basis: str
     safety_notes: str
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
 load_dotenv()
 
 # Initialize FastAPI app
@@ -2565,7 +2568,7 @@ async def verify_token(authorization: str = Header(None)):
     return await auth_service.verify_token(access_token)
 
 @app.post("/auth/refresh")
-async def refresh_token(request: dict):
+async def refresh_token(request: RefreshTokenRequest):
     """
     Refresh access token using refresh token
     
@@ -2576,17 +2579,10 @@ async def refresh_token(request: dict):
         New session with refreshed tokens
     """
     from auth_service import AuthService
-    refresh_token = request.get("refresh_token")
-    
-    if not refresh_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Refresh token is required"
-        )
     
     try:
         auth_service = AuthService()
-        new_session = await auth_service.refresh_token(refresh_token)
+        new_session = await auth_service.refresh_token(request.refresh_token)
         return {"session": new_session}
     except Exception as e:
         raise HTTPException(
