@@ -346,6 +346,36 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
     }
   };
 
+  const loadActiveHabits = async () => {
+    try {
+      // If habits are already passed via route params, use them
+      if (selectedHabits && selectedHabits.length > 0) {
+        console.log('✅ Using habits from route params:', selectedHabits.length);
+        return;
+      }
+
+      // Otherwise, fetch active habits from backend
+      const userId = user?.id;
+      if (!userId) {
+        console.error('No authenticated user found');
+        return;
+      }
+
+      console.log('🔄 Loading active habits for user:', userId);
+      const response = await apiService.makeRequest(`/user/${userId}/active-habits`);
+      
+      if (response && response.habits && response.habits.length > 0) {
+        const habitNames = response.habits.map((h: any) => h.habit_name);
+        setHabitProgress(habitNames.map((habit: string) => ({ habit, completed: false })));
+        console.log('✅ Loaded active habits:', habitNames.length);
+      } else {
+        console.log('⚠️ No active habits found');
+      }
+    } catch (error) {
+      console.error('❌ Error loading active habits:', error);
+    }
+  };
+
   const checkTodayTrackingStatus = async () => {
     try {
       setIsCheckingStatus(true);
@@ -421,6 +451,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
 
   // Load current streak, history, and check today's tracking status on component mount
   useEffect(() => {
+    loadActiveHabits();
     loadCurrentStreak();
     loadDailyHabitsHistory();
     checkTodayTrackingStatus();
@@ -430,6 +461,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   useFocusEffect(
     React.useCallback(() => {
       console.log('🎯 DailyHabitsScreen: Screen focused, refreshing data...');
+      loadActiveHabits();
       loadCurrentStreak();
       loadDailyHabitsHistory();
       checkTodayTrackingStatus();

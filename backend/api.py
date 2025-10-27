@@ -180,6 +180,44 @@ async def get_user_previous_habits(user_id: str):
             detail=f"Error getting user habits: {str(e)}"
         )
 
+@app.get("/user/{user_id}/active-habits")
+async def get_user_active_habits(user_id: str):
+    """
+    Get the user's currently active habits
+    
+    This endpoint returns:
+    - List of active habits from user_habits table
+    - Status and metadata for each habit
+    """
+    try:
+        from models import supabase_client
+        
+        # Fetch user's active habits
+        habits_result = supabase_client.client.table('user_habits')\
+            .select('id, habit_name, habit_description, status, created_at')\
+            .eq('user_id', user_id)\
+            .eq('status', 'active')\
+            .order('created_at', desc=False)\
+            .execute()
+        
+        if habits_result.data:
+            return {
+                "user_id": user_id,
+                "habits": habits_result.data,
+                "count": len(habits_result.data)
+            }
+        else:
+            return {
+                "user_id": user_id,
+                "habits": [],
+                "count": 0
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error getting active habits: {str(e)}"
+        )
+
 @app.get("/admin/custom-interventions")
 async def get_pending_custom_interventions():
     """
