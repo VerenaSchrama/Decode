@@ -274,6 +274,13 @@ class ApiService {
   }
 
   /**
+   * Get user's active habits
+   */
+  async getActiveHabits(userId: string): Promise<{ habits: Array<{ habit_name: string }>; count: number }> {
+    return this.makeRequest<{ habits: Array<{ habit_name: string }>; count: number }>(`/user/${userId}/active-habits`);
+  }
+
+  /**
    * Get daily progress history
    */
   async getDailyProgressHistory(userId: string, limit = 30): Promise<any[]> {

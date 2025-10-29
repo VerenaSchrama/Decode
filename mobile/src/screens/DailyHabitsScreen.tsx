@@ -353,10 +353,10 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       }
 
       console.log('🔄 Loading active habits for user:', userId);
-      const response = await apiService.makeRequest(`/user/${userId}/active-habits`);
+      const response = await apiService.getActiveHabits(userId);
       
       if (response && response.habits && response.habits.length > 0) {
-        const habitNames = response.habits.map((h: any) => h.habit_name);
+        const habitNames = response.habits.map((h) => h.habit_name);
         setHabitProgress(habitNames.map((habit: string) => ({ habit, completed: false })));
         console.log('✅ Loaded active habits:', habitNames.length);
       } else {
