@@ -184,7 +184,10 @@ async def get_user_previous_habits(user_id: str):
         )
 
 @app.get("/user/{user_id}/active-habits")
-async def get_user_active_habits(user_id: str):
+async def get_user_active_habits(
+    user_id: str,
+    authorization: str = Header(None)
+):
     """
     Get the user's currently active habits
     
@@ -193,7 +196,42 @@ async def get_user_active_habits(user_id: str):
     - Status and metadata for each habit
     """
     try:
+        # Verify authentication
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                from auth_service import AuthService
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    # Verify user_id matches authenticated user
+                    if user_info["user_id"] != user_id:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Access denied: user ID mismatch"
+                        )
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            # Allow unauthenticated for backward compatibility, but log warning
+            print(f"⚠️ Unauthenticated request to /user/{user_id}/active-habits")
+        
         from models import supabase_client
+        
+        # First, check if user has any intervention periods with selected_habits
+        # If they do but user_habits don't exist, we should check intervention_periods
+        intervention_result = supabase_client.client.table('intervention_periods')\
+            .select('selected_habits, status')\
+            .eq('user_id', user_id)\
+            .eq('status', 'active')\
+            .order('created_at', desc=True)\
+            .limit(1)\
+            .execute()
         
         # Fetch user's active habits
         habits_result = supabase_client.client.table('user_habits')\
@@ -202,6 +240,71 @@ async def get_user_active_habits(user_id: str):
             .eq('status', 'active')\
             .order('created_at', desc=False)\
             .execute()
+        
+        # If no active habits found but intervention period exists with selected_habits,
+        # try to reactivate or create them
+        if not habits_result.data and intervention_result.data:
+            active_period = intervention_result.data[0]
+            selected_habits = active_period.get('selected_habits', [])
+            
+            if selected_habits:
+                print(f"⚠️ Found active intervention with {len(selected_habits)} habits but no active user_habits. Attempting to reactivate...")
+                
+                # Try to find and reactivate existing habits
+                all_user_habits_result = supabase_client.client.table('user_habits')\
+                    .select('id, habit_name, status')\
+                    .eq('user_id', user_id)\
+                    .in_('habit_name', selected_habits)\
+                    .execute()
+                
+                all_user_habits = all_user_habits_result.data if all_user_habits_result.data else []
+                
+                if all_user_habits:
+                    # Update status to active for existing habits
+                    habit_ids = [h['id'] for h in all_user_habits]
+                    supabase_client.client.table('user_habits')\
+                        .update({'status': 'active', 'updated_at': datetime.now().isoformat()})\
+                        .in_('id', habit_ids)\
+                        .execute()
+                
+                # Check which habits need to be created
+                existing_habit_names = {h['habit_name'] for h in all_user_habits}
+                missing_habits = [h for h in selected_habits if h not in existing_habit_names]
+                
+                if missing_habits:
+                    # Get habit IDs from HabitsBASE
+                    try:
+                        all_habits = supabase_client.client.table('HabitsBASE').select('*').execute()
+                        habit_name_to_id = {habit['Habit_Name']: habit['Habit_ID'] for habit in all_habits.data}
+                        
+                        # Create new user_habits entries
+                        new_user_habits = []
+                        for habit_name in missing_habits:
+                            habit_id = habit_name_to_id.get(habit_name)
+                            if habit_id:
+                                new_user_habits.append({
+                                    'user_id': user_id,
+                                    'habit_name': habit_name,
+                                    'habit_id': habit_id,
+                                    'habit_description': f"Daily habit: {habit_name}",
+                                    'status': 'active',
+                                    'created_at': datetime.now().isoformat(),
+                                    'updated_at': datetime.now().isoformat()
+                                })
+                        
+                        if new_user_habits:
+                            supabase_client.client.table('user_habits').insert(new_user_habits).execute()
+                            print(f"✅ Created {len(new_user_habits)} missing user_habits")
+                    except Exception as create_error:
+                        print(f"⚠️ Error creating missing user_habits: {create_error}")
+                
+                # Re-fetch after all updates
+                habits_result = supabase_client.client.table('user_habits')\
+                    .select('id, habit_name, habit_description, status, created_at')\
+                    .eq('user_id', user_id)\
+                    .eq('status', 'active')\
+                    .order('created_at', desc=False)\
+                    .execute()
         
         if habits_result.data:
             return {
@@ -215,7 +318,10 @@ async def get_user_active_habits(user_id: str):
                 "habits": [],
                 "count": 0
             }
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Error getting active habits: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Error getting active habits: {str(e)}"
