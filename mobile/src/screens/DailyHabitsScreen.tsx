@@ -305,6 +305,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const [isSavingProgress, setIsSavingProgress] = useState(false);
   const [currentStreak, setCurrentStreak] = useState<number>(0);
   const [isTodayTracked, setIsTodayTracked] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(true);
   const [todayDate, setTodayDate] = useState<string>('');
   const { showToast } = useToast();
@@ -558,6 +559,11 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       // Mark today as tracked
       setIsTodayTracked(true);
       
+      // Exit edit mode if we were editing
+      if (isEditing) {
+        setIsEditing(false);
+      }
+      
       showToast('Progress saved successfully!', 'success');
 
     } catch (error) {
@@ -569,8 +575,8 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   };
 
   const toggleHabit = (habit: string) => {
-    // Don't allow toggling if today is already tracked
-    if (isTodayTracked) {
+    // Don't allow toggling if today is already tracked and not in edit mode
+    if (isTodayTracked && !isEditing) {
       showToast('You\'ve already tracked your progress for today!', 'warning');
       return;
     }
@@ -590,8 +596,8 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   };
 
   const openMoodModal = () => {
-    // Don't allow mood tracking if today is already tracked
-    if (isTodayTracked) {
+    // Don't allow mood tracking if today is already tracked and not in edit mode
+    if (isTodayTracked && !isEditing) {
       showToast('You\'ve already tracked your progress for today!', 'warning');
       return;
     }
@@ -806,10 +812,10 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                 style={[
                   styles.trackingHabitItem,
                   habit.completed && styles.trackingHabitItemCompleted,
-                  isTodayTracked && styles.trackingHabitItemLocked
+                  (isTodayTracked && !isEditing) && styles.trackingHabitItemLocked
                 ]}
                 onPress={() => toggleHabit(habit.habit)}
-                disabled={isTodayTracked}
+                disabled={isTodayTracked && !isEditing}
               >
                 <View style={styles.trackingHabitContent}>
                   <View style={[
@@ -854,14 +860,14 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                 <TouchableOpacity 
                   style={[
                     styles.trackingChangeMoodButton,
-                    isTodayTracked && styles.trackingMoodButtonLocked
+                    (isTodayTracked && !isEditing) && styles.trackingMoodButtonLocked
                   ]}
                   onPress={openMoodModal}
-                  disabled={isTodayTracked}
+                  disabled={isTodayTracked && !isEditing}
                 >
                   <Text style={[
                     styles.trackingChangeMoodText,
-                    isTodayTracked && styles.trackingMoodTextLocked
+                    (isTodayTracked && !isEditing) && styles.trackingMoodTextLocked
                   ]}>Update</Text>
                 </TouchableOpacity>
               </View>
@@ -869,19 +875,19 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
               <TouchableOpacity 
                 style={[
                   styles.trackingMoodButton,
-                  isTodayTracked && styles.trackingMoodButtonLocked
+                  (isTodayTracked && !isEditing) && styles.trackingMoodButtonLocked
                 ]}
                 onPress={openMoodModal}
-                disabled={isTodayTracked}
+                disabled={isTodayTracked && !isEditing}
               >
                 <Ionicons 
                   name="happy-outline" 
                   size={24} 
-                  color={isTodayTracked ? '#9CA3AF' : colors.primary} 
+                  color={(isTodayTracked && !isEditing) ? '#9CA3AF' : colors.primary} 
                 />
                 <Text style={[
                   styles.trackingMoodButtonText,
-                  isTodayTracked && styles.trackingMoodTextLocked
+                  (isTodayTracked && !isEditing) && styles.trackingMoodTextLocked
                 ]}>Choose your mood</Text>
               </TouchableOpacity>
             )}
@@ -1023,39 +1029,53 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           </View>
         </Modal>
 
-        {/* Save Button */}
-        <TouchableOpacity 
-          style={[
-            styles.saveButton, 
-            (completedCount === 0 && !moodEntry) && styles.saveButtonDisabled,
-            isTodayTracked && styles.saveButtonLocked
-          ]} 
-          onPress={saveDailyEntry}
-          disabled={(completedCount === 0 && !moodEntry) || isTodayTracked || isCheckingStatus}
-        >
-          <Text style={[
-            styles.saveButtonText,
-            (completedCount === 0 && !moodEntry) && styles.saveButtonTextDisabled,
-            isTodayTracked && styles.saveButtonTextLocked
-          ]}>
-            {isTodayTracked ? '✓ Already Tracked Today' : 'Save Today\'s Progress'}
-          </Text>
-          {(completedCount === 0 && !moodEntry) && !isTodayTracked && (
-            <Text style={styles.saveButtonHint}>
-              Complete habits and mood tracking first
+        {/* Save Button or Already Tracked Bar */}
+        {isTodayTracked && !isEditing ? (
+          <View style={styles.alreadyTrackedBar}>
+            <View style={styles.alreadyTrackedContent}>
+              <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+              <View style={styles.alreadyTrackedText}>
+                <Text style={styles.alreadyTrackedTitle}>✓ Already Tracked Today</Text>
+                <Text style={styles.alreadyTrackedSubtitle}>
+                  You can track again tomorrow at 00:01
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => setIsEditing(true)}
+            >
+              <Text style={styles.editButtonText}>Edit Today's Progress</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity 
+            style={[
+              styles.saveButton, 
+              (completedCount === 0 && !moodEntry) && styles.saveButtonDisabled,
+              isCheckingStatus && styles.saveButtonDisabled
+            ]} 
+            onPress={saveDailyEntry}
+            disabled={(completedCount === 0 && !moodEntry) || isCheckingStatus}
+          >
+            <Text style={[
+              styles.saveButtonText,
+              (completedCount === 0 && !moodEntry) && styles.saveButtonTextDisabled
+            ]}>
+              {isEditing ? 'Save Changes' : 'Save Today\'s Progress'}
             </Text>
-          )}
-          {isTodayTracked && (
-            <Text style={styles.saveButtonHint}>
-              You can track again tomorrow at 00:01
-            </Text>
-          )}
-          {isCheckingStatus && (
-            <Text style={styles.saveButtonHint}>
-              Checking today's status...
-            </Text>
-          )}
-        </TouchableOpacity>
+            {(completedCount === 0 && !moodEntry) && (
+              <Text style={styles.saveButtonHint}>
+                Complete habits and mood tracking first
+              </Text>
+            )}
+            {isCheckingStatus && (
+              <Text style={styles.saveButtonHint}>
+                Checking today's status...
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* History Toggle */}
         <TouchableOpacity 
@@ -2054,6 +2074,45 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  alreadyTrackedBar: {
+    backgroundColor: '#D1FAE5',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#10B981',
+  },
+  alreadyTrackedContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  alreadyTrackedText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  alreadyTrackedTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#10B981',
+    marginBottom: 4,
+  },
+  alreadyTrackedSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  editButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 
