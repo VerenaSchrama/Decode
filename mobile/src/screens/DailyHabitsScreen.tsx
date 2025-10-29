@@ -303,7 +303,6 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const [isUpdatingHabits, setIsUpdatingHabits] = useState(false);
   const [interventionName, setInterventionName] = useState<string>('Control your blood sugar'); // Default intervention
   const [isSavingProgress, setIsSavingProgress] = useState(false);
-  const [saveTimeoutId, setSaveTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [currentStreak, setCurrentStreak] = useState<number>(0);
   const [isTodayTracked, setIsTodayTracked] = useState<boolean>(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(true);
@@ -318,14 +317,6 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
     checkForPhaseChange();
   }, [route?.params?.intakeData]);
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutId) {
-        clearTimeout(saveTimeoutId);
-      }
-    };
-  }, [saveTimeoutId]);
 
   const loadCurrentStreak = async () => {
     try {
@@ -595,16 +586,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       return updated;
     });
     
-    // Clear existing timeout and set a new one to debounce saves
-    if (saveTimeoutId) {
-      clearTimeout(saveTimeoutId);
-    }
-    
-    const newTimeoutId = setTimeout(() => {
-      saveProgressToAPI();
-    }, 1000); // Increased delay to 1 second for better debouncing
-    
-    setSaveTimeoutId(newTimeoutId);
+    // Note: Progress is NOT saved automatically - user must click "Save Today's Progress" button
   };
 
   const openMoodModal = () => {
@@ -636,13 +618,14 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
     setMoodEntry(newMoodEntry);
     setShowMoodModal(false);
     
-    // Save progress to API after mood entry
-    setTimeout(() => {
-      saveProgressToAPI();
-    }, 500);
+    // Note: Progress is NOT saved automatically - user must click "Save Today's Progress" button
   };
 
-  const saveDailyEntry = () => {
+  const saveDailyEntry = async () => {
+    // Call the API to save progress
+    await saveProgressToAPI();
+    
+    // Also update local state for UI display
     const today = new Date().toISOString().split('T')[0];
     const completedCount = habitProgress.filter(h => h.completed).length;
     const totalHabits = habitProgress.length;
