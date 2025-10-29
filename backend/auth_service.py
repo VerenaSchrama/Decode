@@ -214,8 +214,12 @@ class AuthService:
                     detail="Invalid email or password"
                 )
             
-            # Check if user's email is confirmed
-                        # Email confirmation is no longer required
+            # Check if session exists (required for authentication)
+            if not auth_response.session:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication session not available. Please try logging in again."
+                )
             
             # Get user profile using service client (bypasses RLS)
             if self.service_client:
