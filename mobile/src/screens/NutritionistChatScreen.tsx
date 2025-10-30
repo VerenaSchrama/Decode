@@ -37,6 +37,7 @@ export default function NutritionistChatScreen({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
   const { showToast } = useToast();
   const { user, session } = useAuth();
 
@@ -110,6 +111,8 @@ export default function NutritionistChatScreen({
     setMessages(newMessages);
     saveMessagesToLocalStorage(newMessages);
     setInputText('');
+    // Keep focus after sending
+    setTimeout(() => inputRef.current?.focus(), 0);
     setIsLoading(true);
 
     // Debug: Log what data we're sending
@@ -253,7 +256,6 @@ export default function NutritionistChatScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.keyboardDismissView}>
             {/* Header */}
             <View style={styles.header}>
@@ -264,13 +266,17 @@ export default function NutritionistChatScreen({
           <View style={styles.placeholder} />
         </View>
 
-        {/* Messages */}
-        <ScrollView 
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
-        >
+        {/* Messages (tap background to dismiss) */}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={{ flex: 1 }}>
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.messagesContainer}
+              contentContainerStyle={styles.messagesContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              onScrollBeginDrag={Keyboard.dismiss}
+            >
           {messages.length === 0 ? (
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeTitle}>👋 Hi! I'm your AI Nutritionist</Text>
@@ -326,12 +332,15 @@ export default function NutritionistChatScreen({
               </View>
             </View>
           )}
-        </ScrollView>
+            </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
 
         {/* Input */}
-        <View style={styles.inputContainer}>
+        <View style={styles.inputContainer} pointerEvents="box-none">
           <TextInput
             style={styles.textInput}
+            ref={inputRef}
             value={inputText}
             onChangeText={setInputText}
             placeholder="Ask your nutritionist anything..."
@@ -359,7 +368,6 @@ export default function NutritionistChatScreen({
           </TouchableOpacity>
         </View>
           </View>
-        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
