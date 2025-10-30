@@ -1592,9 +1592,11 @@ async def chat_stream(request_raw: Request, authorization: str = Header(None)):
         try:
             if hasattr(llm, "astream"):
                 async for chunk in llm.astream(user_message):
-                    text = getattr(chunk, "content", None) or str(chunk)
-                    if text:
-                        yield f"data: {text}\n\n"
+                    # Only emit actual text tokens; skip framework metadata frames
+                    text = getattr(chunk, "content", "")
+                    if not text:
+                        continue
+                    yield f"data: {text}\n\n"
             else:
                 from asyncio import get_running_loop
                 loop = get_running_loop()
