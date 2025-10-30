@@ -28,6 +28,7 @@ from models.user_interventions import (
 from interventions.inflo_context import get_inflo_context
 from rag_pipeline import process_structured_user_input, process_structured_user_input_async
 from llm import get_llm
+import json
 
 class CustomInterventionValidationRequest(BaseModel):
     intervention: dict
@@ -1500,7 +1501,7 @@ async def send_chat_message(request: ChatRequest, authorization: str = Header(No
         - If the user asks about symptoms, provide specific solutions and foods to try
         - If asking about nutrition, give specific meal suggestions and timing
         - If asking about cycle phases, explain what to do during their specific phase
-        - Keep responses conversational but evidence-based
+        - Keep responses conversational but consice and to the point.
         - If no relevant evidence is found, ask for more specific details about their situation
         - Always end with a specific next step they can take today
         - Refer to "science" or "scientific research" instead of mentioning any specific books or sources
@@ -1714,23 +1715,62 @@ INSTRUCTIONS:
 
     llm = get_llm()
 
+    # Persist user message immediately and emit meta event
+    user_message_id = str(uuid.uuid4())
+    user_timestamp = datetime.now().isoformat()
+    try:
+        from models import supabase_client
+        user_record = {
+            "id": user_message_id,
+            "user_id": user_id,
+            "message": user_message,
+            "is_user": True,
+            "timestamp": user_timestamp,
+            "context_used": None,
+        }
+        supabase_client.client.table('chat_messages').insert(user_record).execute()
+    except Exception as e:
+        print(f"Warning(stream): Could not store user message: {e}")
+
     async def gen():
+        # Send meta event with user_message_id (ignored by current client parser)
+        yield f"event: meta\ndata: {json.dumps({'user_message_id': user_message_id})}\n\n"
         try:
             if hasattr(llm, "astream"):
+                ai_text_accum = ""
                 async for chunk in llm.astream(enhanced_prompt):
                     text = getattr(chunk, "content", "")
                     if not text:
                         continue
+                    ai_text_accum += text
                     yield f"data: {text}\n\n"
             else:
                 from asyncio import get_running_loop
                 loop = get_running_loop()
                 resp = await loop.run_in_executor(None, llm.invoke, enhanced_prompt)
                 text = resp.content if hasattr(resp, "content") else str(resp)
+                ai_text_accum = text
                 yield f"data: {text}\n\n"
         except Exception as e:
             yield f"data: [ERROR] {str(e)}\n\n"
         finally:
+            # Persist AI message and emit saved event
+            try:
+                from models import supabase_client
+                ai_message_id = str(uuid.uuid4())
+                ai_timestamp = datetime.now().isoformat()
+                ai_record = {
+                    "id": ai_message_id,
+                    "user_id": user_id,
+                    "message": ai_text_accum if 'ai_text_accum' in locals() else "",
+                    "is_user": False,
+                    "timestamp": ai_timestamp,
+                    "context_used": None,
+                }
+                supabase_client.client.table('chat_messages').insert(ai_record).execute()
+                yield f"event: saved\ndata: {json.dumps({'ai_message_id': ai_message_id})}\n\n"
+            except Exception as persist_err:
+                print(f"Warning(stream): Could not store AI message: {persist_err}")
             yield "data: [DONE]\n\n"
 
     # Streaming response with CORS-friendly headers
