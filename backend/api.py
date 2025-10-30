@@ -5,7 +5,7 @@ Simple API that takes user input and returns intervention recommendations
 
 from fastapi import FastAPI, HTTPException, Header, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 import os
@@ -432,7 +432,7 @@ async def recommend_intervention(user_input: UserInput, authorization: str = Hea
             result = await process_structured_user_input_async(user_input)
         except Exception as _e:
             # Fallback to sync version if async path fails
-        result = process_structured_user_input(user_input)
+            result = process_structured_user_input(user_input)
         
         # Check if there's an error
         if "error" in result:
@@ -1457,13 +1457,13 @@ async def send_chat_message(request: ChatRequest, authorization: str = Header(No
             phase_result = await cycle_service.get_current_phase(user_id)
             
             if phase_result.get('success'):
-                    cycle_phase_info = {
+                cycle_phase_info = {
                     'phase': phase_result.get('current_phase'),
                     'day': phase_result.get('days_since_period'),
                     'description': f"You are currently on day {phase_result.get('days_since_period')} of your cycle in the {phase_result.get('current_phase')} phase"
                 }
                 print(f"Fetched cycle phase from database: {cycle_phase_info}")
-                except Exception as e:
+        except Exception as e:
             print(f"Error fetching cycle phase: {e}")
         
         # Build user context for the chat
@@ -2429,6 +2429,19 @@ async def get_user_interventions(user_id: str):
         print(f"Error getting user interventions: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get user interventions: {str(e)}")
 
+@app.options("/user/{user_id}/session-data")
+async def session_data_preflight(user_id: str):
+    return Response(
+        status_code=204,
+        headers={
+            "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Max-Age": "86400",
+        },
+    )
+
 @app.get("/user/{user_id}/session-data")
 async def get_user_session_data(user_id: str):
     """
@@ -2540,16 +2553,26 @@ async def get_user_session_data(user_id: str):
         except Exception as e:
             print(f"Error getting intervention periods: {e}")
         
-        return {
-            "success": True,
-            "session_data": session_data
-        }
+        return JSONResponse(
+            content={
+                "success": True,
+                "session_data": session_data
+            },
+            headers={
+                "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
         
     except Exception as e:
         print(f"Error getting user session data: {e}")
-        raise HTTPException(
+        return JSONResponse(
             status_code=500,
-            detail=f"Error getting user session data: {str(e)}"
+            content={"detail": f"Error getting user session data: {str(e)}"},
+            headers={
+                "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
+                "Access-Control-Allow-Credentials": "true",
+            }
         )
 
 @app.get("/interventions/approved", response_model=List[UserInterventionResponse])
