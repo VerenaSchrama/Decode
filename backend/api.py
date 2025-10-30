@@ -3,7 +3,7 @@ FastAPI service for HerFoodCode RAG Pipeline
 Simple API that takes user input and returns intervention recommendations
 """
 
-from fastapi import FastAPI, HTTPException, Header, status, Request
+from fastapi import FastAPI, HTTPException, Header, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -1733,7 +1733,35 @@ INSTRUCTIONS:
         finally:
             yield "data: [DONE]\n\n"
 
-    return StreamingResponse(gen(), media_type="text/event-stream")
+    # Streaming response with CORS-friendly headers
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            # CORS headers (middleware should add these too, but we include explicitly for proxies)
+            "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+        },
+    )
+
+@app.options("/chat/stream")
+async def chat_stream_preflight() -> Response:
+    """Handle CORS preflight for the streaming endpoint."""
+    return Response(
+        status_code=204,
+        headers={
+            "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Max-Age": "86400",
+        },
+    )
 
 @app.get("/chat/history")
 async def get_chat_history(authorization: str = Header(None), limit: int = 50):
