@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, SafeAreaView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { StoryIntakeData, STORY_INTAKE_STEPS } from '../types/StoryIntake';
 import { SymptomsStep } from '../components/story-intake/SymptomsStep';
 import { CycleLengthStep } from '../components/story-intake/CycleLengthStep';
@@ -28,6 +28,37 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
     dietaryPreferences: { selected: [], additional: '' },
     consent: false,
   });
+
+  // Loading progress for /recommend request
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startProgress = () => {
+    setIsLoadingRecommendations(true);
+    setLoadingProgress(5);
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    progressTimerRef.current = setInterval(() => {
+      setLoadingProgress(prev => {
+        // Ease towards 90% while waiting
+        const next = prev + Math.max(1, Math.floor((90 - prev) / 8));
+        return Math.min(next, 90);
+      });
+    }, 400);
+  };
+
+  const finishProgress = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+    setLoadingProgress(100);
+    // Small delay to let the user see completion
+    setTimeout(() => {
+      setIsLoadingRecommendations(false);
+      setLoadingProgress(0);
+    }, 500);
+  };
 
   const handleNext = () => {
     // Skip CycleLengthStep if user doesn't have a period
@@ -70,6 +101,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
     const finalData = { ...formData, ...data };
     
     try {
+      startProgress();
       // Check if user is authenticated
       if (!session?.access_token) {
         throw new Error('User not authenticated. Please log in to get recommendations.');
@@ -108,9 +140,11 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
       };
       
       console.log('✅ Intake completed with intake_id:', enhancedData.intake_id);
+      finishProgress();
       onComplete(enhancedData);
     } catch (error) {
       console.error('❌ Error completing intake:', error);
+      finishProgress();
       // Still pass the data to parent even if API call fails
       onComplete(finalData);
     }
@@ -191,6 +225,18 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
 
   return (
     <View style={styles.container}>
+      {/* Loading progress bar for recommendations */}
+      {isLoadingRecommendations && (
+        <View style={styles.progressWrapper}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${loadingProgress}%` }]} />
+          </View>
+          <View style={styles.progressLabelRow}>
+            <View style={styles.progressDot} />
+            <View style={{ flex: 1 }} />
+          </View>
+        </View>
+      )}
       {renderStepComponent()}
     </View>
   );
@@ -200,5 +246,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  progressWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  progressTrack: {
+    height: 8,
+    backgroundColor: '#ECFDF5', // light green
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#10B981', // emerald
+    borderRadius: 8,
+  },
+  progressLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 6,
+  },
+  progressDot: {
+    width: 0,
+    height: 0,
   },
 });
