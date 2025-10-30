@@ -187,7 +187,6 @@ export default function NutritionistChatScreen({
           });
         }
       );
-      showToast('Message streamed successfully!', 'success');
     } catch (error) {
       console.error('Error sending message:', error);
       showToast(error instanceof Error ? error.message : 'Failed to send message. Please try again.', 'error');
