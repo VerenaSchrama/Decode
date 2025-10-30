@@ -9,7 +9,8 @@ from interventions.inflo_context import get_intervention_with_inflo_context
 from utils.helpers import clean_text
 from utils.cycle_calculator import calculate_cycle_phase, format_cycle_info
 from models import UserInput
-from llm_explanations import generate_batch_explanations
+from llm_explanations import generate_batch_explanations, generate_batch_explanations_async
+import asyncio
 
 def process_user_input(user_input: str) -> Dict:
     """
@@ -178,6 +179,98 @@ def process_structured_user_input(user_input: UserInput) -> Dict:
         print(f"Debug: Final result keys: {list(formatted_result.keys())}")
         return formatted_result
         
+    except Exception as e:
+        return {
+            "error": f"Error processing your request: {str(e)}",
+            "intake_summary": build_intake_summary(user_input),
+            "interventions": [],
+            "total_found": 0
+        }
+
+
+async def process_structured_user_input_async(user_input: UserInput) -> Dict:
+    """Async variant that parallelizes LLM explanation generation."""
+    print(f"🔍 DEBUG: process_structured_user_input_async called with user_input: {user_input}")
+    text_input = build_text_from_structured_input(user_input)
+    if not text_input or not clean_text(text_input):
+        return {
+            "error": "Please provide some information about your symptoms, goals, or concerns"
+        }
+
+    try:
+        multiple_result = get_multiple_intervention_recommendations(text_input, min_similarity=0.50, max_results=3)
+        if not multiple_result['recommendations']:
+            return {
+                "error": "No interventions found with sufficient similarity to your profile. Please try providing more detailed information about your symptoms and goals.",
+                "intake_summary": build_intake_summary(user_input)
+            }
+
+        # Parallel explanations
+        print("🔍 DEBUG: Generating explanations for interventions (async)...")
+        explanations = await generate_batch_explanations_async(user_input, multiple_result['recommendations'])
+
+        for i, intervention in enumerate(multiple_result['recommendations']):
+            if i < len(explanations):
+                intervention['why_recommended'] = explanations[i]
+            else:
+                intervention['why_recommended'] = f"This intervention matches your profile with {intervention.get('similarity_score', 0):.0%} compatibility."
+
+        formatted_result = {
+            "intake_summary": build_intake_summary(user_input),
+            "interventions": multiple_result['recommendations'],
+            "total_found": multiple_result['total_found'],
+            "min_similarity_used": multiple_result['min_similarity_used']
+        }
+
+        # Preserve existing cycle phase enrichment logic
+        cycle_phase = None
+        print(f"Debug: lastPeriod data: {user_input.lastPeriod}")
+        if (user_input.lastPeriod and 
+            user_input.lastPeriod.hasPeriod and 
+            user_input.lastPeriod.date and 
+            user_input.lastPeriod.cycleLength):
+            try:
+                print(f"Debug: Calculating cycle phase for date {user_input.lastPeriod.date}, length {user_input.lastPeriod.cycleLength}")
+                phase, days_since = calculate_cycle_phase(
+                    user_input.lastPeriod.date, 
+                    user_input.lastPeriod.cycleLength
+                )
+                print(f"Debug: Calculated phase: {phase}, days_since: {days_since}")
+                cycle_phase = phase.lower().replace(' ', '-').replace('phase', '').strip()
+                if cycle_phase.endswith('-'):
+                    cycle_phase = cycle_phase[:-1]
+                phase_mapping = {
+                    'follicular-': 'follicular',
+                    'ovulation-': 'ovulatory', 
+                    'luteal-': 'luteal',
+                    'menstrual-': 'menstrual',
+                    'pre-menstrual-': 'luteal'
+                }
+                cycle_phase = phase_mapping.get(cycle_phase, cycle_phase)
+                print(f"Debug: Final cycle_phase: {cycle_phase}")
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Could not calculate cycle phase: {e}")
+        else:
+            print("Debug: No cycle data available for phase calculation")
+
+        if cycle_phase:
+            formatted_result["cycle_phase"] = cycle_phase
+            try:
+                from data.inflo_phase_data import get_phase_data
+                phase_data = get_phase_data(cycle_phase)
+                if phase_data and "phase_info" in phase_data:
+                    formatted_result["phase_info"] = {
+                        "name": phase_data["phase_info"]["name"],
+                        "description": phase_data["phase_info"]["description"],
+                        "duration": phase_data["phase_info"]["duration"],
+                        "energy_level": phase_data["phase_info"]["energy_level"],
+                        "hormonal_focus": phase_data["phase_info"]["hormonal_focus"]
+                    }
+            except Exception as e:
+                print(f"Debug: Error getting phase data: {e}")
+
+        print(f"Debug: Final result keys (async): {list(formatted_result.keys())}")
+        return formatted_result
     except Exception as e:
         return {
             "error": f"Error processing your request: {str(e)}",

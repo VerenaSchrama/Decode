@@ -5,6 +5,7 @@ Generates personalized "why" explanations for each recommended intervention
 
 from typing import Dict, List
 from llm import get_llm
+import asyncio
 from models import UserInput
 
 def generate_intervention_explanation(
@@ -135,6 +136,80 @@ def _build_intervention_context(intervention: Dict, similarity_score: float) -> 
         context_parts.append(f"Dietary fit: {intervention['dietary_fit']}")
     
     return "\n".join(context_parts)
+
+# ===== ASYNC VARIANTS FOR PARALLEL EXECUTION =====
+
+async def generate_intervention_explanation_async(
+    user_input: UserInput,
+    intervention: Dict,
+    similarity_score: float
+) -> str:
+    """Async version using ainvoke when available; falls back to sync in a thread."""
+    try:
+        llm = get_llm()
+
+        user_context = _build_user_context(user_input)
+        intervention_context = _build_intervention_context(intervention, similarity_score)
+
+        prompt = f"""
+You are a knowledgeable nutritionist and women's health expert. Generate a personalized, empathetic explanation for why this specific intervention was recommended for this user.
+
+USER PROFILE:
+{user_context}
+
+RECOMMENDED INTERVENTION:
+{intervention_context}
+
+TASK:
+Write a warm, personalized explanation (2-3 sentences) that:
+1. Acknowledges the user's specific symptoms/challenges
+2. Explains why this intervention is particularly suitable for them
+3. Connects their symptoms to the intervention's benefits
+4. Uses encouraging, supportive language
+5. Mentions the high match percentage naturally
+
+TONE:
+- Warm and empathetic
+- Professional but conversational
+- Encouraging and supportive
+- Specific to their situation
+- Avoid medical jargon
+
+FORMAT:
+Write as if you're speaking directly to the user, starting with "This intervention is perfect for you because..."
+"""
+
+        # Prefer async invocation if available
+        if hasattr(llm, "ainvoke"):
+            response = await llm.ainvoke(prompt)
+        else:
+            # Run sync invocation in a thread to avoid blocking
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(None, llm.invoke, prompt)
+
+        explanation = response.content.strip()
+        if explanation.startswith('"') and explanation.endswith('"'):
+            explanation = explanation[1:-1]
+        return explanation
+    except Exception as e:
+        print(f"Error generating explanation (async): {e}")
+        return f"This intervention matches your profile with {similarity_score:.0%} compatibility, specifically targeting your symptoms and goals."
+
+
+async def generate_batch_explanations_async(
+    user_input: UserInput,
+    interventions: List[Dict]
+) -> List[str]:
+    """Generate multiple explanations concurrently."""
+    tasks = []
+    for intervention in interventions:
+        similarity_score = intervention.get('similarity_score', 0.0)
+        tasks.append(
+            generate_intervention_explanation_async(user_input, intervention, similarity_score)
+        )
+    if not tasks:
+        return []
+    return await asyncio.gather(*tasks, return_exceptions=False)
 
 def generate_batch_explanations(
     user_input: UserInput, 

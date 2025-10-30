@@ -25,7 +25,7 @@ from models.user_interventions import (
 
 # Import RAG functions
 from interventions.inflo_context import get_inflo_context
-from rag_pipeline import process_structured_user_input
+from rag_pipeline import process_structured_user_input, process_structured_user_input_async
 from llm import get_llm
 
 class CustomInterventionValidationRequest(BaseModel):
@@ -426,8 +426,12 @@ async def recommend_intervention(user_input: UserInput, authorization: str = Hea
         )
     
     try:
-        # Process structured user input through RAG pipeline
-        result = process_structured_user_input(user_input)
+        # Process structured user input through RAG pipeline (async parallel explanations)
+        try:
+            result = await process_structured_user_input_async(user_input)
+        except Exception as _e:
+            # Fallback to sync version if async path fails
+            result = process_structured_user_input(user_input)
         
         # Check if there's an error
         if "error" in result:
