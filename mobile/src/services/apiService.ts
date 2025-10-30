@@ -279,10 +279,20 @@ class ApiService {
         buffer = parts.pop() || '';
         for (const part of parts) {
           const lines = part.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data:')) {
-              const text = line.slice(5); // preserve leading spaces from tokens
-              if (text && text.trim() !== '[DONE]') onChunk(text);
+          let eventType = 'message';
+          for (const raw of lines) {
+            const line = raw;
+            if (line.startsWith('event:')) {
+              eventType = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+              const text = line.slice(5);
+              const dataTrim = text.trim();
+              if (dataTrim === '[DONE]') continue;
+              // Skip non-message events (meta/saved) from being appended to chat text
+              if (eventType === 'meta' || eventType === 'saved') {
+                continue;
+              }
+              if (text) onChunk(text);
             }
           }
         }
