@@ -698,6 +698,19 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
     return labels[moodValue - 1] || 'Okay';
   };
 
+  // Helper to get habit subtitle/description
+  const getHabitSubtitle = (habitName: string) => {
+    const subtitles: Record<string, string> = {
+      'Phase-friendly snack': 'Pick a protein + fiber combo today.',
+      'Cook with your phase': 'Choose foods that support your current energy level.',
+      'Eat balanced meals': 'Include protein, healthy fats, and complex carbs.',
+      'Stay hydrated': 'Drink water throughout the day.',
+      'Mindful movement': 'Move in ways that feel good for your body.',
+      'Rest and recovery': 'Prioritize sleep and relaxation.',
+    };
+    return subtitles[habitName] || 'Track your progress with this habit.';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -717,6 +730,29 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           <Text style={styles.title}>Daily Habits</Text>
           <Text style={styles.subtitle}>
             Track your progress and mood today
+          </Text>
+        </View>
+
+        {/* Today's Progress Bar - Moved to Top */}
+        <View style={styles.progressCard}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressTitle}>Today's Progress</Text>
+            <Text style={styles.progressCountText}>
+              {completedCount}/{totalHabits} tracked
+            </Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View 
+              key={`progress-${completedCount}-${totalHabits}`}
+              style={[
+                styles.progressFill, 
+                { width: `${Math.max(progressPercentage, 2)}%` }
+              ]} 
+            />
+          </View>
+          <Text style={styles.progressPercentage}>
+            {totalHabits > 0 ? `${Math.round(progressPercentage)}% complete` : '0% complete'}
+            {isSavingProgress && ' • Saving...'}
           </Text>
         </View>
 
@@ -752,40 +788,6 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           </View>
         )}
 
-        {/* Progress Overview */}
-        <View style={styles.progressCard}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>Today's Progress</Text>
-            <View style={styles.progressHeaderRight}>
-              <Text 
-                key={`count-${completedCount}-${totalHabits}`}
-                style={styles.progressCount}
-              >
-                {completedCount}/{totalHabits} completed
-              </Text>
-              {isSavingProgress && (
-                <Ionicons name="sync" size={16} color={colors.primary} style={styles.savingIcon} />
-              )}
-            </View>
-          </View>
-          <View style={styles.progressBar}>
-            <View 
-              key={`progress-${completedCount}-${totalHabits}`}
-              style={[
-                styles.progressFill, 
-                { width: `${progressPercentage}%` }
-              ]} 
-            />
-          </View>
-          <Text 
-            key={`percentage-${completedCount}-${totalHabits}`}
-            style={styles.progressPercentage}
-          >
-            {Math.round(progressPercentage)}% complete
-            {isSavingProgress && ' (Saving...)'}
-          </Text>
-        </View>
-
         {/* Combined Daily Tracking Card */}
         <View style={styles.dailyTrackingCard}>
           {/* Card Header */}
@@ -798,40 +800,47 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
 
           {/* Habits Section */}
           <View style={styles.trackingHabitsSection}>
-            <Text style={styles.trackingSectionTitle}>
-              {cyclePhase ? `Your Habits for ${cyclePhase.phase} Phase` : 'Your Habits'}
-            </Text>
+            <Text style={styles.trackingSectionTitle}>Your Habits</Text>
             {cyclePhase && (
               <Text style={styles.trackingPhaseContext}>
-                These habits are optimized for your current cycle phase
+                Optimized for your {cyclePhase.phase} phase
               </Text>
             )}
             {habitProgress.map((habit, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
-                  styles.trackingHabitItem,
-                  habit.completed && styles.trackingHabitItemCompleted,
-                  (isTodayTracked && !isEditing) && styles.trackingHabitItemLocked
+                  styles.habitCard,
+                  habit.completed && styles.habitCardCompleted,
+                  (isTodayTracked && !isEditing) && styles.habitCardLocked
                 ]}
                 onPress={() => toggleHabit(habit.habit)}
                 disabled={isTodayTracked && !isEditing}
               >
-                <View style={styles.trackingHabitContent}>
+                <View style={styles.habitCardContent}>
                   <View style={[
-                    styles.trackingHabitCheckbox,
-                    habit.completed && styles.trackingHabitCheckboxCompleted
+                    styles.habitCardCheckbox,
+                    habit.completed && styles.habitCardCheckboxCompleted
                   ]}>
                     {habit.completed && (
-                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
                     )}
                   </View>
-                  <Text style={[
-                    styles.trackingHabitText,
-                    habit.completed && styles.trackingHabitTextCompleted
-                  ]}>
-                    {habit.habit}
-                  </Text>
+                  <View style={styles.habitCardTextContainer}>
+                    <Text style={[
+                      styles.habitCardTitle,
+                      habit.completed && styles.habitCardTitleCompleted
+                    ]}>
+                      {habit.completed && '✅ '}
+                      {habit.habit}
+                    </Text>
+                    <Text style={[
+                      styles.habitCardSubtitle,
+                      habit.completed && styles.habitCardSubtitleCompleted
+                    ]}>
+                      {getHabitSubtitle(habit.habit)}
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             ))}
@@ -1244,6 +1253,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primary,
   },
+  progressCountText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+  },
   progressBar: {
     height: 8,
     backgroundColor: '#E5E7EB',
@@ -1534,6 +1548,63 @@ const styles = StyleSheet.create({
   habitTextCompleted: {
     textDecorationLine: 'line-through',
     color: '#9CA3AF',
+  },
+  // New habit card styles
+  habitCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  habitCardCompleted: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#10B981',
+  },
+  habitCardLocked: {
+    opacity: 0.6,
+  },
+  habitCardContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  habitCardCheckbox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    marginTop: 2,
+  },
+  habitCardCheckboxCompleted: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  habitCardTextContainer: {
+    flex: 1,
+  },
+  habitCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  habitCardTitleCompleted: {
+    color: '#059669',
+  },
+  habitCardSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  habitCardSubtitleCompleted: {
+    color: '#6B7280',
+    opacity: 0.8,
   },
   historyToggle: {
     flexDirection: 'row',
