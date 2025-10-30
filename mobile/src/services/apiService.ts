@@ -281,14 +281,14 @@ class ApiService {
           const lines = part.split('\n');
           for (const line of lines) {
             if (line.startsWith('data:')) {
-              const text = line.slice(5).trim();
-              if (text && text !== '[DONE]') onChunk(text);
+              const text = line.slice(5); // preserve leading spaces from tokens
+              if (text && text.trim() !== '[DONE]') onChunk(text);
             }
           }
         }
       }
       // Flush any remaining plain text (non-SSE)
-      if (buffer.trim()) onChunk(buffer);
+      if (buffer) onChunk(buffer);
     } finally {
       clearTimeout(timeoutId);
     }
