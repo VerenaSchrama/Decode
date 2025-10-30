@@ -432,7 +432,7 @@ async def recommend_intervention(user_input: UserInput, authorization: str = Hea
             result = await process_structured_user_input_async(user_input)
         except Exception as _e:
             # Fallback to sync version if async path fails
-            result = process_structured_user_input(user_input)
+        result = process_structured_user_input(user_input)
         
         # Check if there's an error
         if "error" in result:
@@ -756,7 +756,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             if not user_habit_result.data:
                 # Create new user_habit
                 user_habit_data = {
-                    'user_id': user_id,
+            'user_id': user_id,
                     'habit_name': habit_name,
                     'habit_description': f"Daily habit: {habit_name}",
                     'status': 'active'
@@ -769,7 +769,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             daily_entry_data = {
                 'user_id': user_id,
                 'habit_id': habit_id,
-                'entry_date': entry_date,
+            'entry_date': entry_date,
                 'completed': habit.get('completed', False)
             }
             
@@ -786,8 +786,8 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         if mood:
             try:
                 daily_mood_data = {
-                    'user_id': user_id,
-                    'entry_date': entry_date,
+                'user_id': user_id,
+                'entry_date': entry_date,
                     'mood': mood.get('mood'),
                     'notes': mood.get('notes', ''),
                     'symptoms': mood.get('symptoms', []),
@@ -810,9 +810,9 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'entry_date': entry_date,
             'completion_percentage': completion_percentage,
             'mood': mood.get('mood') if mood else None,
-            'notes': mood.get('notes', '') if mood else '',
+                'notes': mood.get('notes', '') if mood else '',
             'cycle_phase': cycle_phase,
-            'total_habits': total_habits,
+                'total_habits': total_habits,
             'completed_habits': len(completed_habits)
         }
         
@@ -1457,13 +1457,13 @@ async def send_chat_message(request: ChatRequest, authorization: str = Header(No
             phase_result = await cycle_service.get_current_phase(user_id)
             
             if phase_result.get('success'):
-                cycle_phase_info = {
+                    cycle_phase_info = {
                     'phase': phase_result.get('current_phase'),
                     'day': phase_result.get('days_since_period'),
                     'description': f"You are currently on day {phase_result.get('days_since_period')} of your cycle in the {phase_result.get('current_phase')} phase"
                 }
                 print(f"Fetched cycle phase from database: {cycle_phase_info}")
-        except Exception as e:
+                except Exception as e:
             print(f"Error fetching cycle phase: {e}")
         
         # Build user context for the chat
@@ -1575,7 +1575,10 @@ Remember, I'm here to support your health journey with evidence-based recommenda
 
 @app.post("/chat/stream")
 async def chat_stream(request_raw: Request, authorization: str = Header(None)):
-    """Stream chat completion as SSE (text/event-stream)."""
+    """
+    Stream chat completion as SSE (text/event-stream),
+    reusing the same context building and prompt as /chat/message.
+    """
     if not RAG_AVAILABLE:
         raise HTTPException(status_code=503, detail="RAG pipeline not available")
     if not authorization or not authorization.startswith("Bearer "):
@@ -1586,13 +1589,135 @@ async def chat_stream(request_raw: Request, authorization: str = Header(None)):
     if not user_message:
         raise HTTPException(status_code=400, detail="Message is required")
 
+    # Verify authentication and get user_id
+    try:
+        access_token = authorization.split(" ")[1]
+        from auth_service import AuthService
+        auth_service = AuthService()
+        user_info = await auth_service.verify_token(access_token)
+        if not user_info or not user_info.get("success"):
+            raise HTTPException(status_code=401, detail="Invalid authentication token")
+        user_id = user_info["user_id"]
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Token verification error (stream): {e}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
+
+    # Fetch context data (same as /chat/message)
+    from models import supabase_client
+    intake_data = None
+    current_intervention_data = None
+    user_habits_list: List[str] = []
+
+    try:
+        intake_result = supabase_client.client.table('intakes')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .order('created_at', desc=True)\
+            .limit(1)\
+            .execute()
+        if intake_result.data:
+            intake_row = intake_result.data[0]
+            intake_data_raw = intake_row.get('intake_data', {})
+            intake_data = {
+                'profile': intake_data_raw.get('profile', {}),
+                'lastPeriod': intake_data_raw.get('last_period', intake_data_raw.get('lastPeriod', {})),
+                'symptoms': intake_data_raw.get('symptoms', {}),
+                'interventions': intake_data_raw.get('interventions', {}),
+                'dietaryPreferences': intake_data_raw.get('dietary_preferences', intake_data_raw.get('dietaryPreferences', {}))
+            }
+    except Exception as e:
+        print(f"Warning(stream): Could not fetch intake data: {e}")
+
+    try:
+        intervention_result = supabase_client.client.table('intervention_periods')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .eq('status', 'active')\
+            .order('created_at', desc=True)\
+            .limit(1)\
+            .execute()
+        if intervention_result.data:
+            period = intervention_result.data[0]
+            current_intervention_data = {
+                'name': period.get('intervention_name', 'Unknown'),
+                'habits': period.get('selected_habits', []),
+                'start_date': period.get('start_date'),
+                'duration_days': period.get('planned_duration_days', 0)
+            }
+    except Exception as e:
+        print(f"Warning(stream): Could not fetch intervention data: {e}")
+
+    try:
+        habits_result = supabase_client.client.table('user_habits')\
+            .select('habit_name')\
+            .eq('user_id', user_id)\
+            .eq('status', 'active')\
+            .execute()
+        if habits_result.data:
+            user_habits_list = [h['habit_name'] for h in habits_result.data]
+    except Exception as e:
+        print(f"Warning(stream): Could not fetch habits: {e}")
+
+    final_intake_data = intake_data or body.get('intake_data')
+    final_intervention = current_intervention_data or body.get('current_intervention')
+    final_selected_habits = user_habits_list if user_habits_list else (body.get('selected_habits') or [])
+
+    # Cycle phase
+    cycle_phase_info = None
+    try:
+        from services.cycle_phase_service import get_cycle_phase_service
+        cycle_service = get_cycle_phase_service()
+        phase_result = await cycle_service.get_current_phase(user_id)
+        if phase_result.get('success'):
+            cycle_phase_info = {
+                'phase': phase_result.get('current_phase'),
+                'day': phase_result.get('days_since_period'),
+                'description': f"You are currently on day {phase_result.get('days_since_period')} of your cycle in the {phase_result.get('current_phase')} phase"
+            }
+    except Exception as e:
+        print(f"Error fetching cycle phase (stream): {e}")
+
+    # Build enhanced prompt
+    user_context = build_user_context(
+        final_intake_data,
+        final_intervention,
+        final_selected_habits,
+        cycle_phase_info
+    )
+    inflo_context = get_inflo_context(user_message)
+    enhanced_prompt = f"""
+You are a knowledgeable nutritionist and women's health expert specializing in cycle-aware nutrition and wellness.
+You have access to scientific research and evidence-based practices on women's health and food interventions.
+You are trained to provide personalized advice based on the user's profile and current intervention and habits, defined as:
+
+USER CONTEXT:
+{user_context}
+
+SCIENTIFIC EVIDENCE:
+{inflo_context if inflo_context else "No specific scientific evidence found for this query."}
+
+USER QUESTION: {user_message}
+
+INSTRUCTIONS:
+- Provide a concrete, actionable answer based on the scientific evidence above
+- Give specific recommendations (foods, timing, habits) rather than general advice
+- If the user asks about symptoms, provide specific solutions and foods to try
+- If asking about nutrition, give specific meal suggestions and timing
+- If asking about cycle phases, explain what to do during their specific phase
+- Keep responses conversational but evidence-based
+- If no relevant evidence is found, ask for more specific details about their situation
+- Always end with a specific next step they can take today
+- Refer to "science" or "scientific research" instead of mentioning any specific books or sources
+"""
+
     llm = get_llm()
 
     async def gen():
         try:
             if hasattr(llm, "astream"):
-                async for chunk in llm.astream(user_message):
-                    # Only emit actual text tokens; skip framework metadata frames
+                async for chunk in llm.astream(enhanced_prompt):
                     text = getattr(chunk, "content", "")
                     if not text:
                         continue
@@ -1600,7 +1725,7 @@ async def chat_stream(request_raw: Request, authorization: str = Header(None)):
             else:
                 from asyncio import get_running_loop
                 loop = get_running_loop()
-                resp = await loop.run_in_executor(None, llm.invoke, user_message)
+                resp = await loop.run_in_executor(None, llm.invoke, enhanced_prompt)
                 text = resp.content if hasattr(resp, "content") else str(resp)
                 yield f"data: {text}\n\n"
         except Exception as e:
