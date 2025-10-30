@@ -701,31 +701,49 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         from models import supabase_client
         import uuid
         from datetime import datetime
-        
-        user_id = request.get('user_id')
-        if not user_id:
-            raise HTTPException(status_code=400, detail="user_id is required")
-            
-        entry_date = request.get('entry_date', datetime.now().strftime('%Y-%m-%d'))
-        
-        # Check if user has already tracked progress for this date
+
+        # --- Verify auth and bind Supabase context to the caller ---
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        access_token = authorization.split(" ")[1]
         try:
-            existing_result = supabase_client.client.table('daily_summaries')\
-                .select('id, entry_date')\
-                .eq('user_id', user_id)\
-                .eq('entry_date', entry_date)\
-                .execute()
-            
-            if len(existing_result.data) > 0:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Daily progress already tracked for {entry_date}. Only one entry per day is allowed."
-                )
+            from auth_service import AuthService
+            auth_service = AuthService()
+            token_info = await auth_service.verify_token(access_token)
+            if not token_info or not token_info.get("success"):
+                raise HTTPException(status_code=401, detail="Invalid authentication token")
+            token_user_id = token_info["user_id"]
         except HTTPException:
             raise
         except Exception as e:
-            print(f"Warning: Could not check existing entries: {e}")
-            # Continue with save operation if check fails
+            print(f"❌ Token verification error (/daily-progress): {e}")
+            raise HTTPException(status_code=401, detail="Authentication failed")
+
+        user_id = request.get('user_id')
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        if user_id != token_user_id:
+            raise HTTPException(status_code=403, detail="Access denied: user ID mismatch")
+
+        # Bind Supabase client to this user's session so RLS permits inserts
+        try:
+            supabase_client.client.auth.set_auth(access_token)
+        except Exception as e:
+            print(f"⚠️ set_auth failed (continuing with service client if configured): {e}")
+
+        entry_date = request.get('entry_date', datetime.now().strftime('%Y-%m-%d'))
+        
+        # Check if user has already tracked progress for this date
+        existing_result = supabase_client.client.table('daily_summaries')\
+            .select('id, entry_date')\
+            .eq('user_id', user_id)\
+            .eq('entry_date', entry_date)\
+            .execute()
+        if len(existing_result.data) > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Daily progress already tracked for {entry_date}. Only one entry per day is allowed."
+            )
             
         habits = request.get('habits', [])
         mood = request.get('mood', None)
@@ -753,11 +771,9 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 .eq('user_id', user_id)\
                 .eq('habit_name', habit_name)\
                 .execute()
-            
             if not user_habit_result.data:
-                # Create new user_habit
                 user_habit_data = {
-            'user_id': user_id,
+                    'user_id': user_id,
                     'habit_name': habit_name,
                     'habit_description': f"Daily habit: {habit_name}",
                     'status': 'active'
@@ -774,36 +790,25 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 'completed': habit.get('completed', False)
             }
             
-            try:
-                result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
-                entry_id = result.data[0]['id']
-                entry_ids.append(entry_id)
-                print(f"DEBUG: Created daily habit entry: {entry_id}")
-            except Exception as e:
-                print(f"DEBUG: Could not create daily habit entry: {e}")
-                # Continue with other habits
+            result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
+            entry_id = result.data[0]['id']
+            entry_ids.append(entry_id)
         
         # Create daily mood entry (stored separately from habit entries, linked via habit_entry_ids)
         if mood:
-            try:
-                daily_mood_data = {
+            daily_mood_data = {
                 'user_id': user_id,
                 'entry_date': entry_date,
-                    'mood': mood.get('mood'),
-                    'notes': mood.get('notes', ''),
-                    'symptoms': mood.get('symptoms', []),
-                    'cycle_phase': cycle_phase,
-                    'habit_entry_ids': entry_ids  # Store array of daily_habit_entries IDs
-                }
-                # Use upsert to handle duplicate entries for the same day
-                mood_result = supabase_client.client.table('daily_moods').upsert(
-                    daily_mood_data,
-                    { 'on_conflict': 'user_id,entry_date' }
-                ).execute()
-                print(f"DEBUG: Created/updated daily mood entry")
-            except Exception as e:
-                print(f"DEBUG: Could not create daily mood entry: {e}")
-                # Continue without failing the main operation
+                'mood': mood.get('mood'),
+                'notes': mood.get('notes', ''),
+                'symptoms': mood.get('symptoms', []),
+                'cycle_phase': cycle_phase,
+                'habit_entry_ids': entry_ids
+            }
+            supabase_client.client.table('daily_moods').upsert(
+                daily_mood_data,
+                { 'on_conflict': 'user_id,entry_date' }
+            ).execute()
         
         # Create daily summary
         daily_summary_data = {
@@ -817,12 +822,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'completed_habits': len(completed_habits)
         }
         
-        try:
-            summary_result = supabase_client.client.table('daily_summaries').insert(daily_summary_data).execute()
-            print(f"DEBUG: Created daily summary: {summary_result.data[0]['id']}")
-        except Exception as e:
-            print(f"DEBUG: Could not create daily summary: {e}")
-            # Continue without failing the main operation
+        summary_result = supabase_client.client.table('daily_summaries').insert(daily_summary_data).execute()
         
         return {
             "success": True,
