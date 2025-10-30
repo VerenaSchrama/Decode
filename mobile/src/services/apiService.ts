@@ -235,6 +235,66 @@ class ApiService {
   }
 
   /**
+   * Stream chat message response (SSE or chunked text)
+   */
+  async sendChatMessageStream(
+    request: ChatRequest,
+    onChunk: (text: string) => void
+  ): Promise<void> {
+    const url = `${this.config.baseUrl}/chat/stream`;
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (this.authToken) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.authToken}`;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), Math.max(this.config.timeout, 120000));
+
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+
+      if (!resp.ok || !resp.body) {
+        throw new ApiError(`HTTP ${resp.status}: ${resp.statusText}`, resp.status);
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // If SSE, split on double newlines and parse lines starting with 'data:'
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+        for (const part of parts) {
+          const lines = part.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const text = line.slice(5).trim();
+              if (text && text !== '[DONE]') onChunk(text);
+            }
+          }
+        }
+      }
+      // Flush any remaining plain text (non-SSE)
+      if (buffer.trim()) onChunk(buffer);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
    * Get chat history for authenticated user
    */
   async getChatHistory(): Promise<{ messages: ChatMessage[] }> {

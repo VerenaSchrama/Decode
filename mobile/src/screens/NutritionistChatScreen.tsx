@@ -127,31 +127,45 @@ export default function NutritionistChatScreen({
     console.log('=== END DEBUG ===');
 
     try {
-      const data = await apiService.sendChatMessage({
+      // Prepare placeholder AI message we will append to incrementally
+      const aiMessageId = (Date.now() + 1).toString();
+      const startTimestamp = new Date().toISOString();
+      const baseAiMessage: ChatMessage = {
+        id: aiMessageId,
         user_id: userId,
-        message: messageText,
-        // intake_data, current_intervention, and selected_habits are now optional
-        // Backend will fetch from Supabase using the auth token
-        intake_data: intakeData,
-        current_intervention: currentIntervention,
-        selected_habits: selectedHabits,
-      });
-      
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        user_id: userId,
-        message: data.message,
+        message: '',
         is_user: false,
-        timestamp: data.timestamp,
-        context_used: data.context_used,
+        timestamp: startTimestamp,
       };
 
-      setMessages(prevMessages => {
-        const updatedMessages = [...prevMessages, aiMessage];
-        saveMessagesToLocalStorage(updatedMessages);
-        return updatedMessages;
+      setMessages(prev => {
+        const updated = [...prev, baseAiMessage];
+        saveMessagesToLocalStorage(updated);
+        return updated;
       });
-      showToast('Message sent successfully!', 'success');
+
+      await apiService.sendChatMessageStream(
+        {
+          user_id: userId,
+          message: messageText,
+          intake_data: intakeData,
+          current_intervention: currentIntervention,
+          selected_habits: selectedHabits,
+        },
+        (chunk) => {
+          // Append streamed chunk to the last AI message
+          setMessages(prev => {
+            const updated = [...prev];
+            const idx = updated.findIndex(m => m.id === aiMessageId);
+            if (idx !== -1) {
+              updated[idx] = { ...updated[idx], message: (updated[idx].message || '') + chunk };
+            }
+            saveMessagesToLocalStorage(updated);
+            return updated;
+          });
+        }
+      );
+      showToast('Message streamed successfully!', 'success');
     } catch (error) {
       console.error('Error sending message:', error);
       showToast(error instanceof Error ? error.message : 'Failed to send message. Please try again.', 'error');

@@ -3,8 +3,9 @@ FastAPI service for HerFoodCode RAG Pipeline
 Simple API that takes user input and returns intervention recommendations
 """
 
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, HTTPException, Header, status, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 import os
@@ -1571,6 +1572,41 @@ Remember, I'm here to support your health journey with evidence-based recommenda
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/chat/stream")
+async def chat_stream(request_raw: Request, authorization: str = Header(None)):
+    """Stream chat completion as SSE (text/event-stream)."""
+    if not RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="RAG pipeline not available")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authentication token required")
+
+    body = await request_raw.json()
+    user_message = body.get("message", "")
+    if not user_message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    llm = get_llm()
+
+    async def gen():
+        try:
+            if hasattr(llm, "astream"):
+                async for chunk in llm.astream(user_message):
+                    text = getattr(chunk, "content", None) or str(chunk)
+                    if text:
+                        yield f"data: {text}\n\n"
+            else:
+                from asyncio import get_running_loop
+                loop = get_running_loop()
+                resp = await loop.run_in_executor(None, llm.invoke, user_message)
+                text = resp.content if hasattr(resp, "content") else str(resp)
+                yield f"data: {text}\n\n"
+        except Exception as e:
+            yield f"data: [ERROR] {str(e)}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 @app.get("/chat/history")
 async def get_chat_history(authorization: str = Header(None), limit: int = 50):
