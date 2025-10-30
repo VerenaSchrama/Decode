@@ -1,0 +1,16 @@
+
+#Command Deploy backend
+ssh root@65.108.149.135
+cd /srv/mybackend
+git pull origin main
+
+Optioneel: pip install -r requirements.txt
+
+./deploy.sh
+
+# Sync backend code naar server
+rsync -avz --exclude '__pycache__' --exclude 'venv' \
+  ./backend/ root@65.108.149.135:/srv/mybackend
+
+# Herstart de backend service
+ssh root@65.108.149.135 "systemctl restart mybackend"
