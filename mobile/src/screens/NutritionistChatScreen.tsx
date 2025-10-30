@@ -144,6 +144,23 @@ export default function NutritionistChatScreen({
         return updated;
       });
 
+      // Helper to merge streamed chunks with light punctuation normalization
+      const mergeChunk = (prev: string, chunk: string) => {
+        let c = chunk;
+        // If previous ends with a letter/number and chunk starts with space+lowercase, drop that space
+        if (prev && /[A-Za-z0-9]$/.test(prev) && /^\s[a-z]/.test(c)) {
+          c = c.replace(/^\s/, '');
+        }
+        let out = prev + c;
+        // Remove spaces before punctuation
+        out = out.replace(/\s+([,.;:!?])/g, '$1');
+        // Fix spaces before apostrophes: it 's -> it's
+        out = out.replace(/(\w)\s+'(\w)/g, "$1'$2");
+        // Collapse multiple spaces
+        out = out.replace(/ {2,}/g, ' ');
+        return out;
+      };
+
       await apiService.sendChatMessageStream(
         {
           user_id: userId,
@@ -158,7 +175,9 @@ export default function NutritionistChatScreen({
             const updated = [...prev];
             const idx = updated.findIndex(m => m.id === aiMessageId);
             if (idx !== -1) {
-              updated[idx] = { ...updated[idx], message: (updated[idx].message || '') + chunk };
+              const prevText = updated[idx].message || '';
+              const nextText = mergeChunk(prevText, chunk);
+              updated[idx] = { ...updated[idx], message: nextText };
             }
             saveMessagesToLocalStorage(updated);
             return updated;
