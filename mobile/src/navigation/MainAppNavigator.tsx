@@ -108,7 +108,7 @@ function MainAppNavigator({ selectedHabits, intakeData, currentIntervention }: M
         name="Diary" 
         options={{
           title: 'Diary',
-          headerTitle: 'Expert Analysis'
+          headerTitle: 'Your Expert'
         }}
       >
         {() => <DiaryStack intakeData={intakeData} currentIntervention={currentIntervention} selectedHabits={selectedHabits} />}
