@@ -104,20 +104,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadStoredAuth();
   }, []);
 
-  // Register refresh token callback with API interceptor
+  // ✅ Register refresh token callback globally for BOTH api.ts (axios) and apiService (fetch)
   useEffect(() => {
     const refreshCallback = async (refreshToken: string) => {
       try {
+        console.log('🔄 Refreshing token via global callback...');
         const newSession = await authService.refreshToken(refreshToken);
+        
+        // ✅ Update AuthContext state (single source of truth)
+        if (state.user) {
+          const updatedSession = {
+            ...newSession,
+            created_at: Date.now(),
+          };
+          
+          // Update stored session
+          await AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(updatedSession));
+          
+          // ✅ Dispatch state update so all components using useAuth() get fresh token
+          dispatch({
+            type: 'AUTH_SUCCESS',
+            payload: { user: state.user, session: updatedSession },
+          });
+          
+          console.log('✅ Token refreshed and AuthContext state updated');
+        }
+        
         return newSession;
       } catch (error) {
-        console.error('Error in refresh callback:', error);
+        console.error('❌ Error in refresh callback:', error);
         throw error;
       }
     };
     
+    // Register for axios interceptor (existing)
     setRefreshTokenCallback(refreshCallback);
-  }, []);
+    
+    // ✅ Register for apiService (fetch-based) - NEW
+    const { apiService } = require('../services/apiService');
+    apiService.setRefreshTokenCallback(refreshCallback);
+    
+    // ✅ Also sync current token to apiService if available
+    if (state.session?.access_token) {
+      apiService.setAuthToken(state.session.access_token);
+    }
+    
+    console.log('✅ Global refresh token callback registered for both axios and fetch');
+  }, [state.user, state.session?.access_token]); // Re-register if user or token changes
 
   // Setup automatic token refresh every 50 minutes (tokens expire after 60 minutes)
   useEffect(() => {

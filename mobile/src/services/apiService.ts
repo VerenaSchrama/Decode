@@ -106,12 +106,23 @@ export interface HabitStreakResponse {
 class ApiService {
   private config = getApiConfig();
   private authToken: string | null = null;
+  private refreshTokenCallback: ((refreshToken: string) => Promise<any>) | null = null;
+  // ✅ Refresh lock to prevent concurrent refresh attempts
+  private isRefreshing = false;
+  private refreshPromise: Promise<any> | null = null;
 
   /**
    * Set authentication token for subsequent requests
    */
   setAuthToken(token: string | null) {
     this.authToken = token;
+  }
+
+  /**
+   * Set refresh token callback for automatic token refresh on 401 errors
+   */
+  setRefreshTokenCallback(callback: ((refreshToken: string) => Promise<any>) | null) {
+    this.refreshTokenCallback = callback;
   }
 
   /**
@@ -151,6 +162,79 @@ class ApiService {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
+        // ✅ Handle 401 Unauthorized with automatic token refresh
+        if (response.status === 401 && this.refreshTokenCallback && !(options as any)._retry) {
+          console.log('🔄 401 Unauthorized - attempting token refresh...');
+          
+          try {
+            // ✅ Wait for ongoing refresh if one is in progress (prevent race conditions)
+            let newSession;
+            if (this.isRefreshing && this.refreshPromise) {
+              console.log('⏳ Token refresh already in progress, waiting...');
+              newSession = await this.refreshPromise;
+            } else {
+              // Start new refresh
+              this.isRefreshing = true;
+              this.refreshPromise = this.performTokenRefresh();
+              
+              try {
+                newSession = await this.refreshPromise;
+              } finally {
+                this.isRefreshing = false;
+                this.refreshPromise = null;
+              }
+            }
+            
+            if (newSession && newSession.access_token) {
+              // Update auth token
+              this.authToken = newSession.access_token;
+              
+              // Mark this request as retried
+              (options as any)._retry = true;
+              
+              // Update Authorization header
+              const retryHeaders: HeadersInit = {
+                'Content-Type': 'application/json',
+                ...options.headers as Record<string, string>,
+              };
+              (retryHeaders as Record<string, string>)['Authorization'] = `Bearer ${newSession.access_token}`;
+              
+              console.log('✅ Token refreshed successfully, retrying request');
+              
+              // Retry the original request with new token
+              const retryOptions: RequestInit = {
+                ...options,
+                headers: retryHeaders,
+                signal: controller.signal,
+              };
+              
+              const retryResponse = await fetch(url, retryOptions);
+              clearTimeout(timeoutId);
+              
+              if (!retryResponse.ok) {
+                const errorText = await retryResponse.text();
+                let errorMessage = `HTTP ${retryResponse.status}: ${retryResponse.statusText}`;
+                
+                try {
+                  const errorData = JSON.parse(errorText);
+                  errorMessage = errorData.detail || errorData.message || errorMessage;
+                } catch {
+                  // Use default error message if JSON parsing fails
+                }
+                
+                throw new ApiError(errorMessage, retryResponse.status);
+              }
+              
+              const data = await retryResponse.json();
+              console.log(`✅ API Response (after retry): ${options.method || 'GET'} ${url}`, data);
+              return data;
+            }
+          } catch (refreshError) {
+            console.error('❌ Token refresh failed:', refreshError);
+            // Fall through to throw original 401 error
+          }
+        }
+        
         const errorText = await response.text();
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         
@@ -198,6 +282,39 @@ class ApiService {
         'UNKNOWN_ERROR'
       );
     }
+  }
+
+  /**
+   * Perform token refresh (with lock mechanism)
+   */
+  private async performTokenRefresh(): Promise<any> {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    const storedSession = await AsyncStorage.getItem('@auth_session');
+    
+    if (!storedSession) {
+      throw new Error('No stored session found');
+    }
+    
+    const session = JSON.parse(storedSession);
+    
+    if (!session.refresh_token) {
+      throw new Error('No refresh token available');
+    }
+    
+    if (!this.refreshTokenCallback) {
+      throw new Error('No refresh token callback registered');
+    }
+    
+    // Call refresh callback
+    const newSession = await this.refreshTokenCallback(session.refresh_token);
+    
+    // Update stored session
+    await AsyncStorage.setItem('@auth_session', JSON.stringify({
+      ...newSession,
+      created_at: Date.now(),
+    }));
+    
+    return newSession;
   }
 
   /**

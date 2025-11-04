@@ -48,31 +48,53 @@ export default function NutritionistChatScreen({
     return null;
   }
 
-  // Set auth token for API service
+  // ✅ Set auth token for API service FIRST, before any API calls
+  // Note: Refresh callback is registered globally in AuthContext, no need to register per-screen
   useEffect(() => {
-    apiService.setAuthToken(session.access_token);
+    if (session?.access_token) {
+      console.log('🔐 Setting auth token for chat API');
+      apiService.setAuthToken(session.access_token);
+    }
   }, [session?.access_token]);
 
+  // ✅ Load chat history ONLY after token is set
   useEffect(() => {
-    loadChatHistory();
-  }, []);
+    if (session?.access_token) {
+      console.log('📜 Loading chat history with authenticated token');
+      loadChatHistory();
+    }
+  }, [session?.access_token]);
 
   const loadChatHistory = async () => {
     try {
       setIsLoadingHistory(true);
       
-      // Try to load from server first
-      try {
-        const data = await apiService.getChatHistory();
+      // ✅ Ensure token is set before loading history
+      if (session?.access_token) {
+        // ✅ Ensure token is set in apiService
+        apiService.setAuthToken(session.access_token);
+        console.log('🔐 Token verified before loading chat history');
         
-        if (data.messages && data.messages.length > 0) {
-          // Reverse to show oldest first
-          setMessages([...data.messages].reverse());
-          console.log('Loaded chat history from server:', data.messages.length, 'messages');
-          return;
+        // Try to load from server first
+        try {
+          const data = await apiService.getChatHistory();
+          
+          if (data.messages && data.messages.length > 0) {
+            // Reverse to show oldest first
+            setMessages([...data.messages].reverse());
+            console.log('✅ Loaded chat history from server:', data.messages.length, 'messages');
+            return;
+          }
+        } catch (serverError) {
+          console.error('❌ Server chat history error:', serverError);
+          // If it's a 401, log it specifically
+          if (serverError instanceof Error && serverError.message.includes('401')) {
+            console.error('❌ Authentication failed - token may be expired');
+          }
+          console.log('Falling back to local storage');
         }
-      } catch (serverError) {
-        console.log('Server chat history not available, trying local storage');
+      } else {
+        console.warn('⚠️ No access token, skipping server history load');
       }
       
       // Fallback to local storage
@@ -97,6 +119,17 @@ export default function NutritionistChatScreen({
 
   const sendMessage = async () => {
     if (!inputText.trim() || isLoading) return;
+
+    // ✅ Ensure token is set before sending
+    if (!session?.access_token) {
+      console.error('❌ No access token available');
+      showToast('Authentication required. Please log in again.', 'error');
+      return;
+    }
+
+    // ✅ Ensure token is set in apiService
+    apiService.setAuthToken(session.access_token);
+    console.log('🔐 Token verified before sending message');
 
     const messageText = inputText.trim();
     const userMessage: ChatMessage = {
