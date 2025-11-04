@@ -9,6 +9,7 @@ import HabitSelectionScreen from '../screens/HabitSelectionScreen';
 import MainAppScreen from '../screens/MainAppScreen';
 import { interventionPeriodService } from '../services/interventionPeriodService';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppState } from '../contexts/AppStateContext';
 import { getApiConfig } from '../config/environment';
 
 export type AppScreen = 'test' | 'story-intake' | 'thank-you' | 'recommendations' | 'habit-selection' | 'main-app';
@@ -35,36 +36,49 @@ export default function AppNavigator({
   onInterventionSelected,
 }: AppNavigatorProps) {
   const { session } = useAuth();
+  // ✅ Get AppStateContext functions at component level (hooks must be called at top level)
+  const { updateIntakeData, updateSelectedHabits, updateCurrentScreen, updateCurrentIntervention } = useAppState();
+  
   const handleStoryIntakeComplete = (data: StoryIntakeData) => {
-    // Save intake data first
+    // ✅ Update intake data in AppStateContext (no setTimeout needed!)
+    updateIntakeData(data);
+    // ✅ Update screen immediately - state is already updated
+    updateCurrentScreen('thank-you');
+    // Still call the callback for backward compatibility
     onIntakeComplete(data);
-    
-    // Use a small timeout to ensure state updates before navigation
-    // This ensures intakeData is available when navigating to thank-you
-    setTimeout(() => {
-      onScreenChange('thank-you');
-    }, 100);
+    onScreenChange('thank-you');
   };
 
   const handleViewRecommendations = () => {
+    updateCurrentScreen('recommendations');
     onScreenChange('recommendations');
   };
 
   const handleBackToIntake = () => {
+    updateCurrentScreen('story-intake');
     onScreenChange('story-intake');
   };
 
   const handleHabitsSelected = (habits: string[]) => {
+    // ✅ Update habits in AppStateContext
+    updateSelectedHabits(habits);
+    // Callbacks for backward compatibility
     onHabitsSelected?.(habits);
+    updateCurrentScreen('habit-selection');
     onScreenChange('habit-selection');
   };
 
   const handleStartMainApp = (habits: string[]) => {
+    // ✅ Update habits in AppStateContext
+    updateSelectedHabits(habits);
+    // Callbacks for backward compatibility
     onHabitsSelected?.(habits);
+    updateCurrentScreen('main-app');
     onScreenChange('main-app');
   };
 
   const handleBackToRecommendations = () => {
+    updateCurrentScreen('recommendations');
     onScreenChange('recommendations');
   };
 
@@ -88,7 +102,9 @@ export default function AppNavigator({
       return;
     }
     
-    // Store the current intervention
+    // ✅ Store the current intervention in AppStateContext
+    updateCurrentIntervention(intervention);
+    // Callback for backward compatibility
     onInterventionSelected?.(intervention);
     
     // Extract habits from the selected intervention
@@ -186,8 +202,11 @@ export default function AppNavigator({
       return;
     }
     
-    // Pass the habits to the habit selection screen
+    // ✅ Pass the habits to the habit selection screen using AppStateContext
+    updateSelectedHabits(interventionHabits);
+    // Callbacks for backward compatibility
     onHabitsSelected?.(interventionHabits);
+    updateCurrentScreen('habit-selection');
     onScreenChange('habit-selection');
   };
 

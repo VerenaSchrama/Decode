@@ -8,36 +8,39 @@ import { StoryIntakeData } from './src/types/StoryIntake';
 import { colors } from './src/constants/colors';
 import { ToastProvider, useToast } from './src/contexts/ToastContext';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { AppStateProvider, useAppState } from './src/contexts/AppStateContext';
 import SessionService from './src/services/sessionService';
 
 // Main App Component with Authentication
 function AppContent() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const toast = useToast();
+  // ✅ Use AppStateContext instead of local useState
+  const { state, updateIntakeData, updateSelectedHabits, updateCurrentIntervention, updateCurrentScreen } = useAppState();
   console.log('AppContent: Auth state:', { isAuthenticated, isLoading });
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('test');
-  const [intakeData, setIntakeData] = useState<StoryIntakeData | undefined>();
-  const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
-  const [currentIntervention, setCurrentIntervention] = useState<any>(undefined);
   const [isNewRegistration, setIsNewRegistration] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
 
   const handleScreenChange = (screen: AppScreen) => {
-    setCurrentScreen(screen);
+    // ✅ Update screen in AppStateContext
+    updateCurrentScreen(screen);
   };
 
   const handleIntakeComplete = (data: StoryIntakeData) => {
     console.log('🔍 DEBUG App.tsx: handleIntakeComplete called with data:', JSON.stringify(data, null, 2));
     console.log('🔍 DEBUG App.tsx: intake_id in data:', data.intake_id);
-    setIntakeData(data);
+    // ✅ Update intake data in AppStateContext
+    updateIntakeData(data);
   };
 
   const handleHabitsSelected = (habits: string[]) => {
-    setSelectedHabits(habits);
+    // ✅ Update habits in AppStateContext
+    updateSelectedHabits(habits);
   };
 
   const handleInterventionSelected = (intervention: any) => {
-    setCurrentIntervention(intervention);
+    // ✅ Update intervention in AppStateContext
+    updateCurrentIntervention(intervention);
   };
 
   const loadUserSessionData = async () => {
@@ -52,19 +55,19 @@ function AppContent() {
       if (sessionData) {
         console.log('✅ AppContent: Session data loaded:', sessionData);
         
-        // Restore intake data
+        // ✅ Restore intake data using AppStateContext
         if (sessionData.intake_data) {
-          setIntakeData(sessionData.intake_data as unknown as StoryIntakeData);
+          updateIntakeData(sessionData.intake_data as unknown as StoryIntakeData);
         }
         
-        // Restore current intervention
+        // ✅ Restore current intervention using AppStateContext
         if (sessionData.current_intervention) {
-          setCurrentIntervention(sessionData.current_intervention);
+          updateCurrentIntervention(sessionData.current_intervention);
         }
         
-        // Restore selected habits
+        // ✅ Restore selected habits using AppStateContext
         if (sessionData.selected_habits && sessionData.selected_habits.length > 0) {
-          setSelectedHabits(sessionData.selected_habits);
+          updateSelectedHabits(sessionData.selected_habits);
         }
         
         console.log('✅ AppContent: User session restored successfully');
@@ -87,15 +90,17 @@ function AppContent() {
     // Load user session data before navigating
     await loadUserSessionData();
     
-    setCurrentScreen('main-app');
+    // ✅ Update screen using AppStateContext
+    updateCurrentScreen('main-app');
   };
 
   const handleRegisterSuccess = () => {
     console.log('handleRegisterSuccess called');
-    console.log('Current screen before:', currentScreen);
+    console.log('Current screen before:', state.currentScreen);
     // New users go to story intake
     setIsNewRegistration(true);
-    setCurrentScreen('story-intake');
+    // ✅ Update screen using AppStateContext
+    updateCurrentScreen('story-intake');
     console.log('Current screen after:', 'story-intake');
     console.log('isNewRegistration set to:', true);
   };
@@ -108,7 +113,8 @@ function AppContent() {
       if (!isNewRegistration) {
         // If user is already authenticated (returning user), load session data and go to main app
         loadUserSessionData().then(() => {
-          setCurrentScreen('main-app');
+          // ✅ Update screen using AppStateContext
+          updateCurrentScreen('main-app');
         });
       }
       // If isNewRegistration is true, don't override the screen set by handleRegisterSuccess
@@ -141,17 +147,18 @@ function AppContent() {
   }
 
   // Show main app if authenticated
-  console.log('Rendering AppNavigator with currentScreen:', currentScreen);
+  // ✅ Use state from AppStateContext instead of local state
+  console.log('Rendering AppNavigator with currentScreen:', state.currentScreen);
   return (
     <View style={styles.container}>
       <AppNavigator
-        currentScreen={currentScreen}
+        currentScreen={state.currentScreen}
         onScreenChange={handleScreenChange}
-        intakeData={intakeData}
+        intakeData={state.intakeData}
         onIntakeComplete={handleIntakeComplete}
-        selectedHabits={selectedHabits}
+        selectedHabits={state.selectedHabits}
         onHabitsSelected={handleHabitsSelected}
-        currentIntervention={currentIntervention}
+        currentIntervention={state.currentIntervention}
         onInterventionSelected={handleInterventionSelected}
       />
       
@@ -165,9 +172,11 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <NavigationContainer>
-          <AppContent />
-        </NavigationContainer>
+        <AppStateProvider>
+          <NavigationContainer>
+            <AppContent />
+          </NavigationContainer>
+        </AppStateProvider>
       </ToastProvider>
     </AuthProvider>
   );

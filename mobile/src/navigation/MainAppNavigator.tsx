@@ -1,21 +1,28 @@
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 import { colors } from '../constants/colors';
+import { useAppState } from '../contexts/AppStateContext';
 
 // Import the main app screens
 import SocialFeedScreen from '../screens/SocialFeedScreen';
 import RecipeScreen from '../screens/RecipeScreen';
 import DailyHabitsScreen from '../screens/DailyHabitsScreen';
-import DiaryScreen from '../screens/DiaryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import AnalysisScreen from '../screens/AnalysisScreen';
 import NutritionistChatScreen from '../screens/NutritionistChatScreen';
 
-const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+// Define parameter list for tab navigator
+export type MainTabParamList = {
+  Social: undefined;
+  Recipes: undefined;
+  Habits: { selectedHabits?: string[]; intakeData?: any };
+  Diary: undefined;
+  Profile: { intakeData?: any };
+};
+
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 interface MainAppNavigatorProps {
   selectedHabits: string[];
@@ -48,7 +55,14 @@ function DiaryStack({ intakeData, currentIntervention, selectedHabits }: { intak
 }
 
 function MainAppNavigator({ selectedHabits, intakeData, currentIntervention }: MainAppNavigatorProps) {
+  // ✅ Get state from AppStateContext (preferred) or fall back to props (backward compatibility)
+  const { state } = useAppState();
+  const finalSelectedHabits = state.selectedHabits.length > 0 ? state.selectedHabits : (selectedHabits || []);
+  const finalIntakeData = state.intakeData || intakeData;
+  const finalCurrentIntervention = state.currentIntervention || currentIntervention;
+  
   return (
+    // @ts-expect-error - React Navigation v7 type definition issue with id prop
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
@@ -70,7 +84,7 @@ function MainAppNavigator({ selectedHabits, intakeData, currentIntervention }: M
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-                tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabBarLabel,
@@ -102,7 +116,7 @@ function MainAppNavigator({ selectedHabits, intakeData, currentIntervention }: M
           title: 'Habits',
           headerTitle: 'Daily Habits'
         }}
-        initialParams={{ selectedHabits, intakeData }}
+        initialParams={{ selectedHabits: finalSelectedHabits, intakeData: finalIntakeData }}
       />
       <Tab.Screen 
         name="Diary" 
@@ -111,7 +125,7 @@ function MainAppNavigator({ selectedHabits, intakeData, currentIntervention }: M
           headerTitle: 'Your Expert'
         }}
       >
-        {() => <DiaryStack intakeData={intakeData} currentIntervention={currentIntervention} selectedHabits={selectedHabits} />}
+        {() => <DiaryStack intakeData={finalIntakeData} currentIntervention={finalCurrentIntervention} selectedHabits={finalSelectedHabits} />}
       </Tab.Screen>
       <Tab.Screen 
         name="Profile" 
@@ -120,7 +134,7 @@ function MainAppNavigator({ selectedHabits, intakeData, currentIntervention }: M
           title: 'Profile',
           headerTitle: 'Your Profile'
         }}
-        initialParams={{ intakeData }}
+        initialParams={{ intakeData: finalIntakeData }}
       />
     </Tab.Navigator>
   );

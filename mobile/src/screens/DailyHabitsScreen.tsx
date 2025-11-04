@@ -38,6 +38,7 @@ import { DailyProgressAPI, HabitProgress as APIHabitProgress, MoodEntry as APIMo
 import { apiService } from '../services/apiService';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppState } from '../contexts/AppStateContext';
 
 // Detailed phase information function
 const getDetailedPhaseInfo = (phase: string) => {
@@ -276,7 +277,11 @@ interface DailyEntry {
 }
 
 export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
-  const selectedHabits = route?.params?.selectedHabits || [];
+  // ✅ Get state from AppStateContext (preferred) or fall back to route params
+  const { state } = useAppState();
+  const routeHabits = route?.params?.selectedHabits || [];
+  const selectedHabits = state.selectedHabits.length > 0 ? state.selectedHabits : routeHabits;
+  
   const [habitProgress, setHabitProgress] = useState<HabitProgress[]>(
     selectedHabits.map(habit => ({ habit, completed: false }))
   );
@@ -310,13 +315,16 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const [todayDate, setTodayDate] = useState<string>('');
   const { showToast } = useToast();
   const { user } = useAuth();
+  // ✅ Get AppStateContext functions at component level
+  const { updateSelectedHabits } = useAppState();
 
   const cyclePhaseService = CyclePhaseService.getInstance();
 
   // Check for phase changes on component mount and when intake data changes
+  // ✅ Use intakeData from AppStateContext (preferred) or route params
   useEffect(() => {
     checkForPhaseChange();
-  }, [route?.params?.intakeData]);
+  }, [state.intakeData || route?.params?.intakeData]);
 
 
   const loadCurrentStreak = async () => {
@@ -340,26 +348,35 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
 
   const loadActiveHabits = async () => {
     try {
+      // ✅ Priority: AppStateContext > route params > API fallback
+      if (state.selectedHabits && state.selectedHabits.length > 0) {
+        console.log('✅ Using habits from AppStateContext:', state.selectedHabits.length);
+        setHabitProgress(state.selectedHabits.map(habit => ({ habit, completed: false })));
+        return;
+      }
+      
       // If habits are already passed via route params, use them
       if (selectedHabits && selectedHabits.length > 0) {
         console.log('✅ Using habits from route params:', selectedHabits.length);
         return;
       }
 
-      // Otherwise, fetch active habits from backend
+      // ✅ Last resort: fetch active habits from backend (should rarely be needed now)
       const userId = user?.id;
       if (!userId) {
         console.error('No authenticated user found');
         return;
       }
 
-      console.log('🔄 Loading active habits for user:', userId);
+      console.log('🔄 Loading active habits from API (fallback):', userId);
       const response = await apiService.getActiveHabits(userId);
       
       if (response && response.habits && response.habits.length > 0) {
         const habitNames = response.habits.map((h) => h.habit_name);
         setHabitProgress(habitNames.map((habit: string) => ({ habit, completed: false })));
-        console.log('✅ Loaded active habits:', habitNames.length);
+        // ✅ Update AppStateContext so we don't need to fetch again
+        updateSelectedHabits(habitNames);
+        console.log('✅ Loaded active habits from API and updated AppStateContext:', habitNames.length);
       } else {
         console.log('⚠️ No active habits found');
       }
@@ -461,7 +478,8 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   );
 
   const checkForPhaseChange = async () => {
-    const intakeData = route?.params?.intakeData;
+    // ✅ Use intakeData from AppStateContext (preferred) or route params
+    const intakeData = state.intakeData || route?.params?.intakeData;
     if (!intakeData?.lastPeriod?.date || !intakeData?.lastPeriod?.cycleLength) {
       return;
     }
@@ -488,7 +506,9 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   };
 
   const updateHabitsForNewPhase = async () => {
-    if (!cyclePhase || !route?.params?.intakeData) return;
+    // ✅ Use intakeData from AppStateContext (preferred) or route params
+    const intakeData = state.intakeData || route?.params?.intakeData;
+    if (!cyclePhase || !intakeData) return;
 
     setIsUpdatingHabits(true);
     try {
