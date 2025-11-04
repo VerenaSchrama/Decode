@@ -80,8 +80,9 @@ export default function NutritionistChatScreen({
           const data = await apiService.getChatHistory();
           
           if (data.messages && data.messages.length > 0) {
-            // Reverse to show oldest first
-            setMessages([...data.messages].reverse());
+            // Backend returns oldest first (ascending), which is correct for chat (newest at bottom)
+            // Don't reverse - keep chronological order with newest messages at bottom
+            setMessages(data.messages);
             console.log('✅ Loaded chat history from server:', data.messages.length, 'messages');
             return;
           }

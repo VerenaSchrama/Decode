@@ -1533,13 +1533,14 @@ Remember, I'm here to support your health journey with evidence-based recommenda
         # Use authenticated user_id directly (no hashing needed)
         
         # Store user message
+        # Note: context_used should be a JSONB dict, not a string
         user_message = {
             "id": message_id,
             "user_id": user_id,
             "message": request.message,
             "is_user": True,
             "timestamp": user_timestamp,
-            "context_used": user_context
+            "context_used": {"user_context": user_context} if user_context else None
         }
         
         # Store AI response (with slightly later timestamp to ensure correct order)
@@ -1551,19 +1552,26 @@ Remember, I'm here to support your health journey with evidence-based recommenda
             "message": response_message,
             "is_user": False,
             "timestamp": ai_timestamp,
-            "context_used": {"inflo_context": inflo_context}
+            "context_used": {"inflo_context": inflo_context} if inflo_context else None
         }
         
         # Store messages in Supabase
         try:
             from models import supabase_client
+            # Use service role client (should bypass RLS)
             result = supabase_client.client.table('chat_messages').insert([user_message, ai_message]).execute()
-            print(f"Successfully stored chat messages: {len(result.data)} messages")
+            print(f"✅ Successfully stored chat messages: {len(result.data)} messages")
         except Exception as e:
-            print(f"Warning: Could not store chat messages: {e}")
-            print(f"User message: {user_message}")
-            print(f"AI message: {ai_message}")
-            # Continue without storing if table doesn't exist
+            # Log full error details for debugging
+            print(f"❌ ERROR storing chat messages: {e}")
+            print(f"   Error type: {type(e).__name__}")
+            print(f"   User message: {user_message}")
+            print(f"   AI message: {ai_message}")
+            # Re-raise error to surface it (don't silently fail)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to store chat messages: {str(e)}"
+            )
         
         return ChatResponse(
             message=response_message,
@@ -1681,7 +1689,7 @@ async def chat_stream(request_raw: Request, authorization: str = Header(None)):
         print(f"Error fetching cycle phase (stream): {e}")
 
     # Build enhanced prompt
-    user_context = build_user_context(
+    user_context_str = build_user_context(
         final_intake_data,
         final_intervention,
         final_selected_habits,
@@ -1694,7 +1702,7 @@ You have access to scientific research and evidence-based practices on women's h
 You are trained to provide personalized advice based on the user's profile and current intervention and habits, defined as:
 
 USER CONTEXT:
-{user_context}
+{user_context_str}
 
 SCIENTIFIC EVIDENCE:
 {inflo_context if inflo_context else "No specific scientific evidence found for this query."}
@@ -1726,11 +1734,15 @@ INSTRUCTIONS:
             "message": user_message,
             "is_user": True,
             "timestamp": user_timestamp,
-            "context_used": None,
+            "context_used": {"user_context": user_context_str, "inflo_context": inflo_context} if (user_context_str or inflo_context) else None,
         }
-        supabase_client.client.table('chat_messages').insert(user_record).execute()
+        result = supabase_client.client.table('chat_messages').insert(user_record).execute()
+        print(f"✅ Stored user message: {user_message_id}")
     except Exception as e:
-        print(f"Warning(stream): Could not store user message: {e}")
+        print(f"❌ ERROR storing user message: {e}")
+        print(f"   Error type: {type(e).__name__}")
+        print(f"   User record: {user_record}")
+        # Don't fail the stream, but log the error clearly
 
     async def gen():
         # Send meta event with user_message_id (ignored by current client parser)
@@ -1765,12 +1777,16 @@ INSTRUCTIONS:
                     "message": ai_text_accum if 'ai_text_accum' in locals() else "",
                     "is_user": False,
                     "timestamp": ai_timestamp,
-                    "context_used": None,
+                    "context_used": {"inflo_context": inflo_context} if inflo_context else None,
                 }
-                supabase_client.client.table('chat_messages').insert(ai_record).execute()
+                result = supabase_client.client.table('chat_messages').insert(ai_record).execute()
+                print(f"✅ Stored AI message: {ai_message_id}")
                 yield f"event: saved\ndata: {json.dumps({'ai_message_id': ai_message_id})}\n\n"
             except Exception as persist_err:
-                print(f"Warning(stream): Could not store AI message: {persist_err}")
+                print(f"❌ ERROR storing AI message: {persist_err}")
+                print(f"   Error type: {type(persist_err).__name__}")
+                print(f"   AI record: {ai_record}")
+                # Don't fail the stream, but log the error clearly
             yield "data: [DONE]\n\n"
 
     # Streaming response with CORS-friendly headers
