@@ -103,13 +103,13 @@ export interface HabitStreakResponse {
   total_days: number;
 }
 
+// Import global refresh manager
+import { performTokenRefresh } from './tokenRefreshManager';
+
 class ApiService {
   private config = getApiConfig();
   private authToken: string | null = null;
   private refreshTokenCallback: ((refreshToken: string) => Promise<any>) | null = null;
-  // ✅ Refresh lock to prevent concurrent refresh attempts
-  private isRefreshing = false;
-  private refreshPromise: Promise<any> | null = null;
 
   /**
    * Set authentication token for subsequent requests
@@ -167,23 +167,8 @@ class ApiService {
           console.log('🔄 401 Unauthorized - attempting token refresh...');
           
           try {
-            // ✅ Wait for ongoing refresh if one is in progress (prevent race conditions)
-            let newSession;
-            if (this.isRefreshing && this.refreshPromise) {
-              console.log('⏳ Token refresh already in progress, waiting...');
-              newSession = await this.refreshPromise;
-            } else {
-              // Start new refresh
-              this.isRefreshing = true;
-              this.refreshPromise = this.performTokenRefresh();
-              
-              try {
-                newSession = await this.refreshPromise;
-              } finally {
-                this.isRefreshing = false;
-                this.refreshPromise = null;
-              }
-            }
+            // ✅ Use shared global refresh manager (prevents concurrent refreshes with axios)
+            const newSession = await performTokenRefresh();
             
             if (newSession && newSession.access_token) {
               // Update auth token
@@ -199,7 +184,7 @@ class ApiService {
               };
               (retryHeaders as Record<string, string>)['Authorization'] = `Bearer ${newSession.access_token}`;
               
-              console.log('✅ Token refreshed successfully, retrying request');
+              console.log('✅ Token refreshed successfully (fetch), retrying request');
               
               // Retry the original request with new token
               const retryOptions: RequestInit = {
@@ -229,8 +214,18 @@ class ApiService {
               console.log(`✅ API Response (after retry): ${options.method || 'GET'} ${url}`, data);
               return data;
             }
-          } catch (refreshError) {
-            console.error('❌ Token refresh failed:', refreshError);
+          } catch (refreshError: any) {
+            console.error('❌ Token refresh failed (fetch):', refreshError);
+            
+            // ✅ Handle "Already Used" error - clear session
+            if (refreshError?.message?.includes('Already Used') || 
+                refreshError?.message?.includes('Invalid Refresh Token')) {
+              console.error('🔴 Refresh token is invalid, clearing session');
+              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+              await AsyncStorage.removeItem('@auth_session');
+              await AsyncStorage.removeItem('@auth_user');
+            }
+            
             // Fall through to throw original 401 error
           }
         }
@@ -284,38 +279,8 @@ class ApiService {
     }
   }
 
-  /**
-   * Perform token refresh (with lock mechanism)
-   */
-  private async performTokenRefresh(): Promise<any> {
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-    const storedSession = await AsyncStorage.getItem('@auth_session');
-    
-    if (!storedSession) {
-      throw new Error('No stored session found');
-    }
-    
-    const session = JSON.parse(storedSession);
-    
-    if (!session.refresh_token) {
-      throw new Error('No refresh token available');
-    }
-    
-    if (!this.refreshTokenCallback) {
-      throw new Error('No refresh token callback registered');
-    }
-    
-    // Call refresh callback
-    const newSession = await this.refreshTokenCallback(session.refresh_token);
-    
-    // Update stored session
-    await AsyncStorage.setItem('@auth_session', JSON.stringify({
-      ...newSession,
-      created_at: Date.now(),
-    }));
-    
-    return newSession;
-  }
+  // Note: performTokenRefresh() is now handled by global tokenRefreshManager
+  // This ensures axios and fetch share the same refresh lock
 
   /**
    * Check if error should trigger a retry

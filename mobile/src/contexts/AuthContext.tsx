@@ -2,7 +2,8 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthState, User, AuthSession, LoginRequest, RegisterRequest, AuthError } from '../types/Auth';
 import authService from '../services/authService';
-import { setRefreshTokenCallback } from '../services/api';
+import { setRefreshTokenCallback as setAxiosRefreshCallback } from '../services/api';
+import { setRefreshTokenCallback as setGlobalRefreshCallback } from '../services/tokenRefreshManager';
 
 // Auth Actions
 type AuthAction =
@@ -131,16 +132,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
         
         return newSession;
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Error in refresh callback:', error);
+        
+        // ✅ Handle "Already Used" error - refresh token is invalid, force logout
+        if (error?.message?.includes('Already Used') || 
+            error?.message?.includes('Invalid Refresh Token')) {
+          console.error('🔴 Refresh token is invalid (Already Used), forcing logout...');
+          
+          // Clear stored session
+          await clearStoredAuth();
+          
+          // Dispatch logout to clear AuthContext state
+          dispatch({ type: 'AUTH_LOGOUT' });
+          
+          // Note: Actual navigation to login screen should be handled by the app
+          // This ensures the user is logged out and needs to re-authenticate
+        }
+        
         throw error;
       }
     };
     
-    // Register for axios interceptor (existing)
-    setRefreshTokenCallback(refreshCallback);
+    // ✅ Register refresh callback with global manager (used by both axios and fetch)
+    setGlobalRefreshCallback(refreshCallback);
     
-    // ✅ Register for apiService (fetch-based) - NEW
+    // ✅ Also register with axios for backward compatibility
+    setAxiosRefreshCallback(refreshCallback);
+    
+    // ✅ Register for apiService (fetch-based) - uses global manager via performTokenRefresh
     const { apiService } = require('../services/apiService');
     apiService.setRefreshTokenCallback(refreshCallback);
     

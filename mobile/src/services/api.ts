@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getApiConfig } from '../config/environment';
+import { performTokenRefresh, setRefreshTokenCallback } from './tokenRefreshManager';
 
 export const API_BASE_URL = getApiConfig().baseUrl; // Local development server
 
@@ -11,12 +12,8 @@ export const api = axios.create({
   },
 });
 
-// Global variable to store refresh callback (set by AuthContext)
-let refreshTokenCallback: ((refreshToken: string) => Promise<any>) | null = null;
-
-export const setRefreshTokenCallback = (callback: (refreshToken: string) => Promise<any>) => {
-  refreshTokenCallback = callback;
-};
+// Export setRefreshTokenCallback for backward compatibility (now uses global manager)
+export { setRefreshTokenCallback };
 
 // Add response interceptor for automatic token refresh
 api.interceptors.response.use(
@@ -29,38 +26,33 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Get the refresh token from AsyncStorage
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        const storedSession = await AsyncStorage.getItem('@auth_session');
+        // ✅ Use shared global refresh manager (prevents concurrent refreshes)
+        const newSession = await performTokenRefresh();
         
-        if (storedSession && refreshTokenCallback) {
-          const session = JSON.parse(storedSession);
+        if (newSession && newSession.access_token) {
+          // Update the authorization header for the retry
+          originalRequest.headers.Authorization = `Bearer ${newSession.access_token}`;
           
-          if (session.refresh_token) {
-            console.log('🔄 Token expired, refreshing...');
-            
-            // Call refresh callback
-            const newSession = await refreshTokenCallback(session.refresh_token);
-            
-            // Update the stored session
-            await AsyncStorage.setItem('@auth_session', JSON.stringify({
-              ...newSession,
-              created_at: Date.now(),
-            }));
-
-            // Update the authorization header for the retry
-            originalRequest.headers.Authorization = `Bearer ${newSession.access_token}`;
-            
-            console.log('✅ Token refreshed successfully, retrying request');
-            
-            // Retry the original request
-            return api(originalRequest);
-          }
+          console.log('✅ Token refreshed successfully (axios), retrying request');
+          
+          // Retry the original request
+          return api(originalRequest);
         }
-      } catch (refreshError) {
-        console.error('❌ Token refresh failed:', refreshError);
-        // If refresh fails, redirect to login screen
-        // This would require navigation context, so we'll just reject the error
+      } catch (refreshError: any) {
+        console.error('❌ Token refresh failed (axios):', refreshError);
+        
+        // ✅ Handle "Already Used" error - force logout
+        if (refreshError?.message?.includes('Already Used') || 
+            refreshError?.message?.includes('Invalid Refresh Token')) {
+          console.error('🔴 Refresh token is invalid, user should re-login');
+          // Clear stored session
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          await AsyncStorage.removeItem('@auth_session');
+          await AsyncStorage.removeItem('@auth_user');
+        }
+        
+        // If refresh fails, reject the error
+        return Promise.reject(refreshError);
       }
     }
 
