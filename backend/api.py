@@ -701,7 +701,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         from models import supabase_client
         import uuid
         from datetime import datetime
-
+        
         # --- Verify auth and bind Supabase context to the caller ---
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Authentication token required")
@@ -773,7 +773,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 .execute()
             if not user_habit_result.data:
                 user_habit_data = {
-                    'user_id': user_id,
+            'user_id': user_id,
                     'habit_name': habit_name,
                     'habit_description': f"Daily habit: {habit_name}",
                     'status': 'active'
@@ -802,21 +802,19 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 'mood': mood.get('mood'),
                 'notes': mood.get('notes', ''),
                 'symptoms': mood.get('symptoms', []),
-                'cycle_phase': cycle_phase,
+            'cycle_phase': cycle_phase,
                 'habit_entry_ids': entry_ids
-            }
+        }
             supabase_client.client.table('daily_moods').upsert(
                 daily_mood_data,
                 { 'on_conflict': 'user_id,entry_date' }
             ).execute()
         
-        # Create daily summary
+        # Create daily summary (mood and notes are stored in daily_moods table, not here)
         daily_summary_data = {
-            'user_id': user_id,
-            'entry_date': entry_date,
+                'user_id': user_id,
+                'entry_date': entry_date,
             'completion_percentage': completion_percentage,
-            'mood': mood.get('mood') if mood else None,
-                'notes': mood.get('notes', '') if mood else '',
             'cycle_phase': cycle_phase,
                 'total_habits': total_habits,
             'completed_habits': len(completed_habits)
@@ -1045,16 +1043,36 @@ async def get_user_analytics(user_id: str, days: int = 30):
             print(f"Database query failed (RLS or other issue): {db_error}")
             summaries = []
         
+        # Fetch mood data from daily_moods table
+        moods_by_date = {}
+        try:
+            moods_result = supabase_client.client.table('daily_moods')\
+                .select('entry_date, mood')\
+                .eq('user_id', user_id)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', end_date.isoformat())\
+                .execute()
+            
+            for mood_entry in moods_result.data:
+                moods_by_date[mood_entry['entry_date']] = mood_entry.get('mood')
+        except Exception as e:
+            print(f"Could not retrieve mood data for analytics: {e}")
+        
         # Calculate analytics
         if summaries:
             completion_percentages = [s['completion_percentage'] for s in summaries if s['completion_percentage'] is not None]
-            moods = [s['overall_mood'] for s in summaries if s['overall_mood'] is not None]
+            # Get moods from daily_moods table, matching by entry_date
+            moods = []
+            for summary in summaries:
+                mood_value = moods_by_date.get(summary['entry_date'])
+                if mood_value is not None:
+                    moods.append(mood_value)
             
             # Basic statistics
             avg_completion = sum(completion_percentages) / len(completion_percentages) if completion_percentages else 0
             avg_mood = sum(moods) / len(moods) if moods else 0
             
-            # Best and worst days
+            # Best and worst days (with mood data attached)
             best_day = max(summaries, key=lambda x: x['completion_percentage']) if summaries else None
             worst_day = min(summaries, key=lambda x: x['completion_percentage']) if summaries else None
             
@@ -1109,12 +1127,12 @@ async def get_user_analytics(user_id: str, days: int = 30):
                 "best_day": {
                     "date": best_day['entry_date'] if best_day else None,
                     "completion_percentage": best_day['completion_percentage'] if best_day else None,
-                    "mood": best_day['overall_mood'] if best_day else None
+                    "mood": moods_by_date.get(best_day['entry_date']) if best_day else None
                 },
                 "worst_day": {
                     "date": worst_day['entry_date'] if worst_day else None,
                     "completion_percentage": worst_day['completion_percentage'] if worst_day else None,
-                    "mood": worst_day['overall_mood'] if worst_day else None
+                    "mood": moods_by_date.get(worst_day['entry_date']) if worst_day else None
                 },
                 "weekly_trends": weekly_trends
             }

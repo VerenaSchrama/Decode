@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -80,6 +80,34 @@ export default function RecommendationsScreen({ intakeData, onBack, onHabitsSele
   const [selectedIntervention, setSelectedIntervention] = useState<Intervention | null>(null);
   const [expandedInterventions, setExpandedInterventions] = useState<Set<number>>(new Set());
   const [showPeriodSelection, setShowPeriodSelection] = useState(false);
+  
+  // Loading progress for /recommend request
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startProgress = () => {
+    setLoadingProgress(5);
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    progressTimerRef.current = setInterval(() => {
+      setLoadingProgress(prev => {
+        // Ease towards 90% while waiting
+        const next = prev + Math.max(1, Math.floor((90 - prev) / 8));
+        return Math.min(next, 90);
+      });
+    }, 400);
+  };
+
+  const finishProgress = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+    setLoadingProgress(100);
+    // Small delay to let the user see completion
+    setTimeout(() => {
+      setLoadingProgress(0);
+    }, 500);
+  };
 
   useEffect(() => {
     console.log('🔄 RecommendationsScreen useEffect triggered with intakeData:', intakeData);
@@ -90,6 +118,14 @@ export default function RecommendationsScreen({ intakeData, onBack, onHabitsSele
       setError('No intake data available. Please complete the intake process first.');
       setLoading(false);
     }
+    
+    // Cleanup progress timer on unmount
+    return () => {
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
+    };
   }, [intakeData]);
 
   const fetchRecommendations = async () => {
@@ -97,6 +133,7 @@ export default function RecommendationsScreen({ intakeData, onBack, onHabitsSele
       console.log('🚀 Starting fetchRecommendations with intakeData:', intakeData);
       setLoading(true);
       setError(null);
+      startProgress(); // Start progress animation
       console.log('📡 Calling getRecommendations API...');
       const result = await getRecommendations(intakeData, session?.access_token);
       console.log('📡 API result:', result);
@@ -169,6 +206,7 @@ export default function RecommendationsScreen({ intakeData, onBack, onHabitsSele
       console.error('Recommendation fetch error:', err);
       setError('Failed to fetch recommendations');
     } finally {
+      finishProgress(); // Complete progress animation
       setLoading(false);
     }
   };
@@ -210,8 +248,42 @@ export default function RecommendationsScreen({ intakeData, onBack, onHabitsSele
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          {/* Circular Progress Indicator with ActivityIndicator */}
+          <View style={styles.circularProgressContainer}>
+            <View style={styles.circularProgressTrack}>
+              {/* Animated progress arc */}
+              <View 
+                style={[
+                  styles.circularProgressFill,
+                  { 
+                    transform: [{ 
+                      rotate: `${(loadingProgress / 100) * 360}deg` 
+                    }],
+                  }
+                ]} 
+              />
+            </View>
+            <ActivityIndicator 
+              size="large" 
+              color="#3b82f6" 
+              style={styles.loadingSpinner}
+            />
+          </View>
           <Text style={styles.loadingText}>Generating your personalized recommendations...</Text>
+          {/* Horizontal Progress Bar */}
+          <View style={styles.progressBarContainer}>
+            <View style={styles.progressBarTrack}>
+              <View 
+                style={[
+                  styles.progressBarFill,
+                  { width: `${Math.max(loadingProgress, 2)}%` }
+                ]} 
+              />
+            </View>
+            <Text style={styles.progressBarText}>
+              {Math.round(loadingProgress)}%
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -464,8 +536,63 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: '#64748b',
-    marginTop: 16,
+    marginTop: 24,
+    marginBottom: 24,
     textAlign: 'center',
+  },
+  // Circular progress indicator styles
+  circularProgressContainer: {
+    position: 'relative',
+    width: 80,
+    height: 80,
+    marginBottom: 8,
+  },
+  circularProgressTrack: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 6,
+    borderColor: '#E5E7EB',
+    position: 'absolute',
+  },
+  circularProgressFill: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 6,
+    borderColor: '#3b82f6',
+    borderRightColor: 'transparent',
+    borderBottomColor: 'transparent',
+    position: 'absolute',
+  },
+  loadingSpinner: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+  },
+  // Horizontal progress bar styles
+  progressBarContainer: {
+    width: '100%',
+    maxWidth: 300,
+    marginTop: 8,
+  },
+  progressBarTrack: {
+    height: 8,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 8,
+  },
+  progressBarText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    fontWeight: '500',
   },
   errorContainer: {
     flex: 1,
