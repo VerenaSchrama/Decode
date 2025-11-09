@@ -107,8 +107,14 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
         throw new Error('User not authenticated. Please log in to get recommendations.');
       }
       
+      // Validate consent is true
+      if (!finalData.consent) {
+        throw new Error('User consent is required to process your request. Please provide consent to continue.');
+      }
+      
       // Debug: Log the data being sent
       console.log('🔍 DEBUG: Sending intake data:', JSON.stringify(finalData, null, 2));
+      console.log('✅ Consent validated:', finalData.consent);
       
       // User is already authenticated, so we can call the /recommend endpoint directly
       const apiUrl = getApiConfig().baseUrl;
