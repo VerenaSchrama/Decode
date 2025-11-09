@@ -114,7 +114,7 @@ export const getRecommendations = async (storyIntakeData: any, accessToken?: str
                 selected: storyIntakeData.dietaryPreferences?.selected || [],
                 additional: storyIntakeData.dietaryPreferences?.additional || '',
               },
-              consent: storyIntakeData.consent || false,
+              consent: storyIntakeData.consent === true ? true : false, // Explicitly ensure boolean
             };
 
     console.log('📤 Sending to API:', JSON.stringify(userInput, null, 2));

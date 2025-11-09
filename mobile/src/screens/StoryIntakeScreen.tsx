@@ -131,6 +131,14 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
         'final value': finalData.consent
       });
       
+      // Ensure consent is explicitly set to true in the request body
+      const requestBody = {
+        ...finalData,
+        consent: true // Force consent to true since we've validated it above
+      };
+      
+      console.log('📤 Final request body consent:', requestBody.consent);
+      
       // User is already authenticated, so we can call the /recommend endpoint directly
       const apiUrl = getApiConfig().baseUrl;
       const response = await fetch(`${apiUrl}/recommend`, {
@@ -139,7 +147,7 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`, // Use authenticated user's token
         },
-        body: JSON.stringify(finalData),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
