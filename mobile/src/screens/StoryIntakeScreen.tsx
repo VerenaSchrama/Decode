@@ -98,7 +98,12 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
 
   const handleComplete = async (data: StoryIntakeData) => {
     // Use formData instead of data parameter to ensure all updates are included
-    const finalData = { ...formData, ...data };
+    // Ensure consent from the data parameter takes precedence
+    const finalData = { 
+      ...formData, 
+      ...data,
+      consent: data.consent !== undefined ? data.consent : formData.consent // Explicitly ensure consent is set
+    };
     
     try {
       startProgress();
@@ -107,14 +112,24 @@ export default function StoryIntakeScreen({ onComplete }: StoryIntakeScreenProps
         throw new Error('User not authenticated. Please log in to get recommendations.');
       }
       
-      // Validate consent is true
+      // Validate consent is true - this is required by the backend
       if (!finalData.consent) {
+        console.error('❌ Consent validation failed:', {
+          'data.consent': data.consent,
+          'formData.consent': formData.consent,
+          'finalData.consent': finalData.consent
+        });
         throw new Error('User consent is required to process your request. Please provide consent to continue.');
       }
       
       // Debug: Log the data being sent
       console.log('🔍 DEBUG: Sending intake data:', JSON.stringify(finalData, null, 2));
       console.log('✅ Consent validated:', finalData.consent);
+      console.log('✅ Consent source check:', {
+        'from data param': data.consent,
+        'from formData': formData.consent,
+        'final value': finalData.consent
+      });
       
       // User is already authenticated, so we can call the /recommend endpoint directly
       const apiUrl = getApiConfig().baseUrl;

@@ -33,8 +33,10 @@ export const ConsentStep: React.FC<ConsentStepProps> = ({
   const handleComplete = () => {
     const updatedData = {
       ...data,
-      consent,
+      consent: consent, // Explicitly set consent value
     };
+    console.log('✅ ConsentStep: handleComplete called with consent:', consent);
+    console.log('✅ ConsentStep: updatedData:', JSON.stringify(updatedData, null, 2));
     // Update the form data before completing
     onUpdate(updatedData);
     // Use the latest updatedData with all form changes
