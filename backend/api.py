@@ -2927,16 +2927,23 @@ async def login_user(login_data: UserLogin):
     return await auth_service.login_user(login_data)
 
 @app.post("/auth/logout")
-async def logout_user(access_token: str):
+async def logout_user(authorization: str = Header(None)):
     """
     Logout user and invalidate session
     
     Args:
-        access_token: User's access token
+        authorization: Authorization header with Bearer token
         
     Returns:
         Logout confirmation
     """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+    
+    access_token = authorization.split(" ")[1]
     return await auth_service.logout_user(access_token)
 
 @app.get("/auth/profile/{user_id}")
