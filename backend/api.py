@@ -778,7 +778,17 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                     'habit_description': f"Daily habit: {habit_name}",
                     'status': 'active'
                 }
-                user_habit_result = supabase_client.client.table('user_habits').insert(user_habit_data).execute()
+                try:
+                    user_habit_result = supabase_client.client.table('user_habits').insert(user_habit_data).execute()
+                    print(f"✅ Created user_habit: {habit_name} for user {user_id}")
+                except Exception as e:
+                    print(f"❌ ERROR creating user_habit '{habit_name}': {e}")
+                    print(f"   Data: {user_habit_data}")
+                    continue  # Skip this habit if we can't create the user_habit
+            
+            if not user_habit_result.data or len(user_habit_result.data) == 0:
+                print(f"⚠️ No user_habit found for '{habit_name}' after lookup/creation, skipping")
+                continue
             
             habit_id = user_habit_result.data[0]['id']
             
@@ -786,13 +796,22 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             daily_entry_data = {
                 'user_id': user_id,
                 'habit_id': habit_id,
-            'entry_date': entry_date,
+                'entry_date': entry_date,
                 'completed': habit.get('completed', False)
             }
             
-            result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
-            entry_id = result.data[0]['id']
-            entry_ids.append(entry_id)
+            try:
+                result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
+                if result.data and len(result.data) > 0:
+                    entry_id = result.data[0]['id']
+                    entry_ids.append(entry_id)
+                    print(f"✅ Created daily_habit_entry: {entry_id} for habit '{habit_name}' (completed: {habit.get('completed', False)})")
+                else:
+                    print(f"⚠️ Insert succeeded but no data returned for habit '{habit_name}'")
+            except Exception as e:
+                print(f"❌ ERROR creating daily_habit_entry for '{habit_name}': {e}")
+                print(f"   Data: {daily_entry_data}")
+                # Continue with other habits even if one fails
         
         # Create daily mood entry (stored separately from habit entries, linked via habit_entry_ids)
         if mood:
@@ -802,25 +821,40 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 'mood': mood.get('mood'),
                 'notes': mood.get('notes', ''),
                 'symptoms': mood.get('symptoms', []),
-            'cycle_phase': cycle_phase,
+                'cycle_phase': cycle_phase,
                 'habit_entry_ids': entry_ids
-        }
-            supabase_client.client.table('daily_moods').upsert(
-                daily_mood_data,
-                { 'on_conflict': 'user_id,entry_date' }
-            ).execute()
+            }
+            try:
+                supabase_client.client.table('daily_moods').upsert(
+                    daily_mood_data,
+                    { 'on_conflict': 'user_id,entry_date' }
+                ).execute()
+                print(f"✅ Created/updated daily_mood entry for {entry_date}")
+            except Exception as e:
+                print(f"❌ ERROR creating daily_mood entry: {e}")
+                print(f"   Data: {daily_mood_data}")
         
-        # Create daily summary (mood and notes are stored in daily_moods table, not here)
+        # Create daily summary
+        # Note: overall_mood and overall_notes still exist in schema for backward compatibility
+        # We populate them from mood data if available, but primary mood storage is in daily_moods table
         daily_summary_data = {
-                'user_id': user_id,
-                'entry_date': entry_date,
+            'user_id': user_id,
+            'entry_date': entry_date,
             'completion_percentage': completion_percentage,
             'cycle_phase': cycle_phase,
-                'total_habits': total_habits,
-            'completed_habits': len(completed_habits)
+            'total_habits': total_habits,
+            'completed_habits': len(completed_habits),
+            'overall_mood': mood.get('mood') if mood else None,
+            'overall_notes': mood.get('notes', '') if mood else None
         }
         
-        summary_result = supabase_client.client.table('daily_summaries').insert(daily_summary_data).execute()
+        try:
+            summary_result = supabase_client.client.table('daily_summaries').insert(daily_summary_data).execute()
+            print(f"✅ Created daily_summary for {entry_date}: {len(completed_habits)}/{total_habits} habits completed")
+        except Exception as e:
+            print(f"❌ ERROR creating daily_summary: {e}")
+            print(f"   Data: {daily_summary_data}")
+            # Don't fail the whole request if summary creation fails
         
         return {
             "success": True,

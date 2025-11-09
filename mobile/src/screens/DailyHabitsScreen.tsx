@@ -314,9 +314,17 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(true);
   const [todayDate, setTodayDate] = useState<string>('');
   const { showToast } = useToast();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   // ✅ Get AppStateContext functions at component level
   const { updateSelectedHabits } = useAppState();
+
+  // ✅ Ensure auth token is set in apiService before making API calls
+  useEffect(() => {
+    if (session?.access_token) {
+      apiService.setAuthToken(session.access_token);
+      console.log('🔐 Auth token set for daily progress API');
+    }
+  }, [session?.access_token]);
 
   const cyclePhaseService = CyclePhaseService.getInstance();
 
