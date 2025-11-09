@@ -3532,9 +3532,20 @@ async def startup_event():
         scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
         scheduler_thread.start()
     
-    # Start the background tasks
-    asyncio.create_task(daily_recalculation_task())
-    asyncio.create_task(auto_complete_interventions_task())
+    # Start the background tasks (with error handling to prevent app crash)
+    try:
+        asyncio.create_task(daily_recalculation_task())
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to start daily recalculation task: {e}")
+        import traceback
+        print(traceback.format_exc())
+    
+    try:
+        asyncio.create_task(auto_complete_interventions_task())
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to start auto-complete task: {e}")
+        import traceback
+        print(traceback.format_exc())
     
     # Register event listeners (import services package to trigger registration)
     try:
@@ -3542,6 +3553,8 @@ async def startup_event():
         print("✅ Event listeners registered for intervention completion")
     except Exception as e:
         print(f"⚠️ Warning: Could not register event listeners: {e}")
+        import traceback
+        print(traceback.format_exc())
 
 if __name__ == "__main__":
     import uvicorn
