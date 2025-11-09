@@ -459,8 +459,8 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       }
     } catch (error) {
       console.error('❌ Error loading daily habits history:', error);
-      setHistoryError('Failed to load previous entries');
-      showToast('Failed to load previous entries', 'error');
+      setHistoryError('Failed to load habit history');
+      showToast('Failed to load habit history', 'error');
     } finally {
       setIsLoadingHistory(false);
     }
@@ -761,29 +761,6 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           </Text>
         </View>
 
-        {/* Today's Progress Bar - Moved to Top */}
-        <View style={styles.progressCard}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>Today's Progress</Text>
-            <Text style={styles.progressCountText}>
-              {completedCount}/{totalHabits} tracked
-            </Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View 
-              key={`progress-${completedCount}-${totalHabits}`}
-              style={[
-                styles.progressFill, 
-                { width: `${Math.max(progressPercentage, 2)}%` }
-              ]} 
-            />
-          </View>
-          <Text style={styles.progressPercentage}>
-            {totalHabits > 0 ? `${Math.round(progressPercentage)}% complete` : '0% complete'}
-            {isSavingProgress && ' • Saving...'}
-          </Text>
-        </View>
-
         {/* Enhanced Current Phase Info */}
         {cyclePhase && (
           <View style={styles.phaseInfoCard}>
@@ -1074,7 +1051,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
               <View style={styles.alreadyTrackedText}>
                 <Text style={styles.alreadyTrackedTitle}>✓ Already Tracked Today</Text>
                 <Text style={styles.alreadyTrackedSubtitle}>
-                  You can track again tomorrow at 00:01
+                  You can track again tomorrow!
                 </Text>
               </View>
             </View>
@@ -1120,7 +1097,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           onPress={() => setShowHistory(!showHistory)}
         >
           <Text style={styles.historyToggleText}>
-            {showHistory ? 'Hide' : 'Show'} Previous Entries
+            {showHistory ? 'Hide' : 'Show'} Habit History
           </Text>
           <Ionicons 
             name={showHistory ? "chevron-up" : "chevron-down"} 
@@ -1133,7 +1110,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
         {showHistory && (
           <View style={styles.historyCard}>
             <View style={styles.historyHeader}>
-              <Text style={styles.historyTitle}>Previous Entries</Text>
+              <Text style={styles.historyTitle}>Habit History</Text>
               {isLoadingHistory && (
                 <Ionicons name="sync" size={16} color={colors.primary} />
               )}
@@ -1141,7 +1118,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
             
             {isLoadingHistory ? (
               <View style={styles.historyLoading}>
-                <Text style={styles.historyLoadingText}>Loading previous entries...</Text>
+                <Text style={styles.historyLoadingText}>Loading habit history...</Text>
               </View>
             ) : historyError ? (
               <View style={styles.historyError}>
@@ -1155,7 +1132,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
               </View>
             ) : dailyEntries.length === 0 ? (
               <View style={styles.historyEmpty}>
-                <Text style={styles.historyEmptyText}>No previous entries found</Text>
+                <Text style={styles.historyEmptyText}>No habit history found</Text>
                 <Text style={styles.historyEmptySubtext}>Start tracking your habits to see your progress here</Text>
               </View>
             ) : (
@@ -1244,61 +1221,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  progressCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  progressHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  savingIcon: {
-    marginLeft: 8,
-  },
-  progressTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  progressCount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  progressCountText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 4,
-  },
-  progressPercentage: {
-    fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
   },

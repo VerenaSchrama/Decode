@@ -796,7 +796,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             daily_entry_data = {
                 'user_id': user_id,
                 'habit_id': habit_id,
-                'entry_date': entry_date,
+            'entry_date': entry_date,
                 'completed': habit.get('completed', False)
             }
             
@@ -842,7 +842,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'entry_date': entry_date,
             'completion_percentage': completion_percentage,
             'cycle_phase': cycle_phase,
-            'total_habits': total_habits,
+                'total_habits': total_habits,
             'completed_habits': len(completed_habits),
             'overall_mood': mood.get('mood') if mood else None,
             'overall_notes': mood.get('notes', '') if mood else None
@@ -2380,28 +2380,69 @@ async def complete_intervention_period(
     request: dict,
     authorization: str = Header(None)
 ):
-    """Mark an intervention period as completed"""
+    """
+    Mark an intervention period as completed (Event-Driven)
+    
+    Uses event-driven architecture to:
+    - Update intervention_periods status
+    - Update related user_habits
+    - Generate completion analytics
+    - Send notifications
+    """
     try:
-        from intervention_period_service import intervention_period_service
+        # Verify authentication
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                from auth_service import AuthService
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
         
         # Extract completion data
         notes = request.get("notes")
         
-        # Complete intervention period
-        result = intervention_period_service.complete_intervention_period(
+        # Use new event-driven intervention service
+        from services.intervention_service import intervention_service
+        
+        # Complete intervention period (triggers events)
+        result = intervention_service.complete_period(
             period_id=period_id,
-            notes=notes
+            notes=notes,
+            auto_completed=False
         )
         
-        if result["success"]:
-            return result
+        if result.get("success"):
+            # Return result with event processing info
+            return {
+                "success": True,
+                "message": result.get("message", "Intervention period completed"),
+                "period_id": period_id,
+                "event_results": result.get("event_results", [])
+            }
         else:
-            raise HTTPException(status_code=500, detail=result.get("error", "Failed to complete intervention"))
+            error_msg = result.get("error", "Failed to complete intervention")
+            if result.get("already_completed"):
+                raise HTTPException(status_code=400, detail="Intervention period already completed")
+            raise HTTPException(status_code=500, detail=error_msg)
             
     except HTTPException:
         raise
     except Exception as e:
         print(f"❌ Error completing intervention: {e}")
+        import traceback
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 # ============================================================================
@@ -3164,8 +3205,47 @@ async def startup_event():
         scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
         scheduler_thread.start()
     
-    # Start the background task
+    async def auto_complete_interventions_task():
+        """Auto-complete expired intervention periods daily at 00:05"""
+        import schedule
+        import time
+        from services.intervention_scheduler import auto_complete_expired_periods
+        
+        def auto_complete_all():
+            """Sync function to run async auto-completion"""
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(auto_complete_expired_periods())
+                print(f"✅ Auto-completion task completed: {result.get('completed_count', 0)} periods completed")
+            finally:
+                loop.close()
+        
+        # Schedule daily auto-completion at 00:05 (5 minutes after cycle recalculation)
+        schedule.every().day.at("00:05").do(auto_complete_all)
+        
+        print("✅ Scheduled daily intervention auto-completion at 00:05")
+        
+        # Run scheduler in a separate thread
+        import threading
+        def run_scheduler():
+            while True:
+                schedule.run_pending()
+                time.sleep(60)  # Check every minute
+        
+        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+        scheduler_thread.start()
+    
+    # Start the background tasks
     asyncio.create_task(daily_recalculation_task())
+    asyncio.create_task(auto_complete_interventions_task())
+    
+    # Register event listeners (import services package to trigger registration)
+    try:
+        import services  # This triggers __init__.py which registers listeners
+        print("✅ Event listeners registered for intervention completion")
+    except Exception as e:
+        print(f"⚠️ Warning: Could not register event listeners: {e}")
 
 if __name__ == "__main__":
     import uvicorn
