@@ -110,27 +110,16 @@ export default function ThankYouScreen({ onViewRecommendations, intakeData }: Th
             }}
           />
         </View>
-        
-        <View style={styles.messageContainer}>
-          <Text style={styles.message}>
-            Thank you for your contribution on behalf of all women with similar struggles! 
-            Please press the button below to find the recommendations that best match your profile.
-          </Text>
-        </View>
 
         <View style={styles.benefitsContainer}>
-          <Text style={styles.benefitsTitle}>Your contribution helps:</Text>
+          <Text style={styles.benefitsTitle}>What's next?:</Text>
           <View style={styles.benefitItem}>
             <Text style={styles.benefitIcon}>👥</Text>
-            <Text style={styles.benefitText}>Other women find personalized solutions</Text>
+            <Text style={styles.benefitText}>Please press the button below to find the recommendations that best match your profile.</Text>
           </View>
           <View style={styles.benefitItem}>
             <Text style={styles.benefitIcon}>🔬</Text>
-            <Text style={styles.benefitText}>Improve our AI recommendations</Text>
-          </View>
-          <View style={styles.benefitItem}>
-            <Text style={styles.benefitIcon}>💪</Text>
-            <Text style={styles.benefitText}>Advance women's health research</Text>
+            <Text style={styles.benefitText}>Meanwhile, your contribution advances womens health research and will help improve recommendations to other women with similar struggles</Text>
           </View>
         </View>
 

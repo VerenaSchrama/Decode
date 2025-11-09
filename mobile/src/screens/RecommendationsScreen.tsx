@@ -229,13 +229,17 @@ export default function RecommendationsScreen({ intakeData, onBack, onHabitsSele
     startDate: string;
     endDate: string;
   }) => {
+    console.log('🎯 RecommendationsScreen: handlePeriodSelected called with:', periodData);
     setShowPeriodSelection(false);
     if (onInterventionSelected) {
+      console.log('✅ RecommendationsScreen: Calling onInterventionSelected callback');
       onInterventionSelected(periodData.intervention, {
         durationDays: periodData.durationDays,
         startDate: periodData.startDate,
         endDate: periodData.endDate,
       });
+    } else {
+      console.error('❌ RecommendationsScreen: onInterventionSelected callback is missing!');
     }
   };
 
@@ -503,15 +507,6 @@ export default function RecommendationsScreen({ intakeData, onBack, onHabitsSele
           </View>
         )}
 
-        {/* Data Collection Status */}
-        {recommendations.data_collection && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Data Saved</Text>
-            <Text style={styles.dataText}>
-              ✅ Your story has been saved and will help other women with similar challenges
-            </Text>
-          </View>
-        )}
 
       </ScrollView>
     </SafeAreaView>

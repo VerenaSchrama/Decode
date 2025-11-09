@@ -166,23 +166,44 @@ class SimpleIntakeService:
                 print(f"⚠️ Intervention not found in database: {intervention_name}")
     
     def _process_custom_interventions(self, user_id: str, intake_id: str, additional_interventions: str) -> None:
-        """Process custom interventions mentioned by the user"""
+        """Process custom interventions mentioned by the user
         
-        # Create custom intervention record
-        custom_intervention_data = {
-            'user_id': user_id,  # Use user_id to match database schema
-            'intake_id': intake_id,
-            'intervention_name': additional_interventions,
-            'description': f"User mentioned: {additional_interventions}",
-            'context': f"Additional intervention interest from intake",
-            'status': 'pending'
-        }
+        Parses the additional_interventions string (which may contain multiple interventions
+        separated by newlines) and creates a separate custom_interventions record for each one.
+        """
+        if not additional_interventions or not additional_interventions.strip():
+            return  # No custom interventions to process
         
-        try:
-            self.service_client.table('custom_interventions').insert(custom_intervention_data).execute()
-        except Exception as e:
-            print(f"⚠️ Could not create custom intervention: {e}")
-            # Continue execution even if custom intervention storage fails
+        # Split by newlines and process each intervention separately
+        intervention_lines = additional_interventions.strip().split('\n')
+        
+        created_count = 0
+        for line in intervention_lines:
+            # Trim whitespace and skip empty lines
+            intervention_name = line.strip()
+            if not intervention_name:
+                continue
+            
+            # Create a separate custom intervention record for each line
+            custom_intervention_data = {
+                'user_id': user_id,  # Use user_id to match database schema
+                'intake_id': intake_id,
+                'intervention_name': intervention_name,
+                'description': f"User mentioned: {intervention_name}",
+                'context': f"Additional intervention interest from intake (line {created_count + 1})",
+                'status': 'pending'
+            }
+            
+            try:
+                self.service_client.table('custom_interventions').insert(custom_intervention_data).execute()
+                created_count += 1
+                print(f"✅ Created custom intervention record: {intervention_name[:50]}...")
+            except Exception as e:
+                print(f"⚠️ Could not create custom intervention '{intervention_name[:50]}...': {e}")
+                # Continue processing other interventions even if one fails
+        
+        if created_count > 0:
+            print(f"✅ Successfully created {created_count} custom intervention record(s) from intake")
     
     def _store_recommendation(self, intake_id: str, recommendation_data: Dict) -> None:
         """Store the recommendation data for this intake"""

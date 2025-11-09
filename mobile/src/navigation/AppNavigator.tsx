@@ -88,8 +88,9 @@ export default function AppNavigator({
     endDate: string;
   }) => {
     // Store intervention and period data for the main app
-    console.log('Intervention selected:', intervention.name);
-    console.log('Period data:', periodData);
+    console.log('🎯 AppNavigator: handleInterventionSelected called');
+    console.log('📋 Intervention selected:', intervention.name);
+    console.log('📅 Period data:', periodData);
     
     // Check if user is properly authenticated
     if (!session?.access_token) {

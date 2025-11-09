@@ -177,13 +177,18 @@ export const InterventionsStep: React.FC<InterventionsStepProps> = ({
         {/* Additional Interventions */}
         <View style={styles.additionalContainer}>
           <Text style={styles.additionalLabel}>Other interventions (optional)</Text>
+          <Text style={styles.additionalHint}>
+            Enter each intervention on a separate line
+          </Text>
           <TextInput
             style={styles.additionalInput}
-            placeholder="Describe any other interventions you've tried..."
+            placeholder="Enter each intervention on a separate line...&#10;&#10;Example:&#10;i tried hot water every morning&#10;i tried savoury breakfast instead of sweet breakfast"
             value={additionalInterventions}
             onChangeText={setAdditionalInterventions}
             multiline
-            numberOfLines={3}
+            numberOfLines={5}
+            textAlignVertical="top"
+            placeholderTextColor="#9CA3AF"
           />
         </View>
       </ScrollView>
@@ -334,6 +339,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
+  },
+  additionalHint: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   additionalInput: {
     borderWidth: 1,

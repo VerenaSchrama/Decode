@@ -11,7 +11,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import CustomInterventionScreen from './CustomInterventionScreen';
-import { DailyProgressAPI, DailyHabitsHistoryEntry } from '../services/dailyProgressApi';
 import { interventionPeriodService } from '../services/interventionPeriodService';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -52,7 +51,7 @@ export default function AnalysisScreen({
     hasHabits: false,
   });
 
-  // Load progress metrics
+  // Load progress metrics using backend endpoint
   const loadProgressMetrics = async () => {
     if (!user?.id || !session?.access_token) {
       setProgressMetrics(prev => ({ ...prev, isLoading: false, hasIntervention: false, hasHabits: false }));
@@ -106,58 +105,35 @@ export default function AnalysisScreen({
         return;
       }
 
-      // Has both intervention and habits - calculate metrics
-      const startDate = new Date(period.start_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      // Calculate days passed
-      const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      
-      // Get total days from planned_end_date or default to 30
-      let totalDays = 30;
-      if (period.planned_end_date) {
-        const endDate = new Date(period.planned_end_date);
-        totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      } else if ((period as any).planned_duration_days) {
-        // Fallback: check if planned_duration_days exists in the response
-        totalDays = (period as any).planned_duration_days;
+      // Has both intervention and habits - use backend progress endpoint
+      console.log('📊 Loading progress metrics for period:', period.id);
+      const progressResponse = await interventionPeriodService.getInterventionPeriodProgress(
+        period.id,
+        session.access_token
+      );
+
+      if (progressResponse.success && progressResponse.metrics) {
+        const metrics = progressResponse.metrics;
+        setProgressMetrics({
+          averageMood: metrics.average_mood,
+          daysPassed: metrics.days_passed,
+          totalDays: metrics.total_days,
+          fullyCompletedDays: metrics.fully_completed_days,
+          isLoading: false,
+          hasIntervention: true,
+          hasHabits: true,
+        });
+        console.log('✅ Progress metrics loaded:', metrics);
+      } else {
+        console.error('❌ Failed to load progress metrics:', progressResponse.error);
+        // Fallback to showing intervention exists but no metrics
+        setProgressMetrics(prev => ({
+          ...prev,
+          isLoading: false,
+          hasIntervention: true,
+          hasHabits: true,
+        }));
       }
-      
-      // Get daily habits history for the period (fetch enough days to cover the period)
-      const historyResponse = await DailyProgressAPI.getDailyHabitsHistory(user.id, Math.max(totalDays, 60));
-      const entries: DailyHabitsHistoryEntry[] = historyResponse.entries || [];
-      
-      // Filter entries within the intervention period
-      const periodEntries = entries.filter(entry => {
-        const entryDate = new Date(entry.date);
-        entryDate.setHours(0, 0, 0, 0);
-        return entryDate >= startDate && entryDate <= today;
-      });
-      
-      // Calculate average mood
-      const moodEntries = periodEntries
-        .filter(entry => entry.mood && entry.mood.mood)
-        .map(entry => entry.mood!.mood);
-      
-      const averageMood = moodEntries.length > 0
-        ? moodEntries.reduce((sum, mood) => sum + mood, 0) / moodEntries.length
-        : null;
-      
-      // Count days with fully completed habits (100% completion)
-      const fullyCompletedDays = periodEntries.filter(
-        entry => entry.completion_percentage === 100
-      ).length;
-      
-      setProgressMetrics({
-        averageMood,
-        daysPassed: Math.max(0, daysPassed),
-        totalDays,
-        fullyCompletedDays,
-        isLoading: false,
-        hasIntervention: true,
-        hasHabits: true,
-      });
     } catch (error) {
       console.error('Error loading progress metrics:', error);
       setProgressMetrics(prev => ({ ...prev, isLoading: false }));
@@ -170,11 +146,12 @@ export default function AnalysisScreen({
     loadProgressMetrics();
   }, [user?.id, currentIntervention]);
 
-  // Refresh when screen comes into focus
+  // Refresh when screen comes into focus (e.g., after saving daily progress)
   useFocusEffect(
     React.useCallback(() => {
+      console.log('🔄 AnalysisScreen: Screen focused, refreshing progress metrics...');
       loadProgressMetrics();
-    }, [user?.id])
+    }, [user?.id, session?.access_token])
   );
   const getCyclePhaseInfo = () => {
     if (!intakeData?.lastPeriod) return null;

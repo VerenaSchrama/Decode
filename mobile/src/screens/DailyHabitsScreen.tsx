@@ -753,35 +753,37 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           />
         )}
 
-        {/* Enhanced Current Phase Info */}
+        {/* Your Cycle Phase Today Block */}
         {cyclePhase && (
-          <View style={styles.phaseInfoCard}>
-            <Text style={styles.phaseTitle}>Current Cycle Phase</Text>
-            <Text style={styles.phaseName}>{cyclePhase.phase}</Text>
-            <Text style={styles.phaseDescription}>{cyclePhase.phaseDescription}</Text>
-            <Text style={styles.phaseDetails}>
-              Energy: {cyclePhase.energyLevel} | Focus: {cyclePhase.hormonalFocus}
-            </Text>
-            
-            {/* Learn More Dropdown */}
-            <TouchableOpacity 
-              style={styles.learnMoreButton}
-              onPress={() => setShowPhaseDetails(!showPhaseDetails)}
-            >
-              <Text style={styles.learnMoreText}>Learn more about my current phase</Text>
-              <Ionicons 
-                name={showPhaseDetails ? "chevron-up" : "chevron-down"} 
-                size={20} 
-                color={colors.primary} 
-              />
-            </TouchableOpacity>
-            
-            {/* Detailed Phase Information - Collapsible */}
-            {showPhaseDetails && (
-              <View style={styles.phaseDetailsSection}>
-                {getDetailedPhaseInfo(cyclePhase.phase)}
-              </View>
-            )}
+          <View style={styles.cyclePhaseBlock}>
+            <Text style={styles.cyclePhaseBlockHeader}>Your cycle phase today</Text>
+            <View style={styles.phaseInfoCard}>
+              <Text style={styles.phaseName}>{cyclePhase.phase}</Text>
+              <Text style={styles.phaseDescription}>{cyclePhase.phaseDescription}</Text>
+              <Text style={styles.phaseDetails}>
+                Energy: {cyclePhase.energyLevel} | Focus: {cyclePhase.hormonalFocus}
+              </Text>
+              
+              {/* Learn More Dropdown */}
+              <TouchableOpacity 
+                style={styles.learnMoreButton}
+                onPress={() => setShowPhaseDetails(!showPhaseDetails)}
+              >
+                <Text style={styles.learnMoreText}>Learn more about my current phase</Text>
+                <Ionicons 
+                  name={showPhaseDetails ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color={colors.primary} 
+                />
+              </TouchableOpacity>
+              
+              {/* Detailed Phase Information - Collapsible */}
+              {showPhaseDetails && (
+                <View style={styles.phaseDetailsSection}>
+                  {getDetailedPhaseInfo(cyclePhase.phase)}
+                </View>
+              )}
+            </View>
           </View>
         )}
 
@@ -1706,24 +1708,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   // Phase tracking styles
+  cyclePhaseBlock: {
+    marginBottom: 20,
+  },
+  cyclePhaseBlockHeader: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 12,
+  },
   phaseInfoCard: {
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-  },
-  phaseTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 4,
+    borderLeftColor: '#10B981', // Dark green border as shown in image
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   phaseName: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.primary,
+    color: '#10B981', // Bold green to match image
     marginBottom: 4,
   },
   phaseDescription: {

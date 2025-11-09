@@ -57,12 +57,19 @@ export class InterventionPeriodService {
     accessToken: string
   ): Promise<{ success: boolean; period_id?: string; message?: string; error?: string }> {
     try {
+      console.log('🌐 InterventionPeriodService: Making API call to /intervention-periods/start');
+      console.log('📤 Request payload:', JSON.stringify(request, null, 2));
+      console.log('🔐 Access token present:', !!accessToken);
+      
       const response = await api.post('/intervention-periods/start', request, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         }
       });
+      
+      console.log('✅ InterventionPeriodService: API response status:', response.status);
+      console.log('📥 Response data:', response.data);
 
       if (response.status === 200) {
         return {
@@ -81,6 +88,52 @@ export class InterventionPeriodService {
       return {
         success: false,
         error: error.response?.data?.detail || error.message || 'Failed to start intervention period'
+      };
+    }
+  }
+
+  /**
+   * Get progress metrics for a specific intervention period
+   */
+  async getInterventionPeriodProgress(
+    periodId: string,
+    accessToken: string
+  ): Promise<{ 
+    success: boolean; 
+    metrics?: {
+      average_mood: number | null;
+      days_passed: number;
+      total_days: number;
+      fully_completed_days: number;
+      tracked_days: number;
+      completion_rate: number;
+    };
+    error?: string;
+  }> {
+    try {
+      const response = await api.get(`/intervention-periods/${periodId}/progress`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.status === 200 && response.data.success) {
+        return {
+          success: true,
+          metrics: response.data.metrics
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.detail || 'Failed to get progress metrics'
+        };
+      }
+    } catch (error: any) {
+      console.error('Error getting intervention period progress:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.message || 'Failed to get progress metrics'
       };
     }
   }

@@ -2299,6 +2299,12 @@ async def start_intervention_period(
     authorization: str = Header(None)
 ):
     """Start tracking a new intervention period"""
+    print("=" * 80)
+    print("🚀 POST /intervention-periods/start - REQUEST RECEIVED")
+    print("=" * 80)
+    print(f"📥 Request body: {json.dumps(request, indent=2, default=str)}")
+    print(f"🔐 Authorization header present: {bool(authorization)}")
+    
     try:
         from intervention_period_service import InterventionPeriodService
         intervention_period_service = InterventionPeriodService()
@@ -2321,8 +2327,11 @@ async def start_intervention_period(
                     raise HTTPException(status_code=401, detail="Invalid authentication token")
             except Exception as e:
                 print(f"❌ Token verification error: {e}")
+                import traceback
+                print(traceback.format_exc())
                 raise HTTPException(status_code=401, detail="Authentication failed")
         else:
+            print("❌ No authorization header provided")
             raise HTTPException(status_code=401, detail="Authentication token required")
         
         # Extract data from request
@@ -2334,7 +2343,17 @@ async def start_intervention_period(
         start_date = request.get("start_date")  # User-selected start date
         cycle_phase = request.get("cycle_phase")
         
+        print(f"📋 Extracted data:")
+        print(f"   - intake_id: {intake_id}")
+        print(f"   - intervention_name: {intervention_name}")
+        print(f"   - selected_habits: {selected_habits} (count: {len(selected_habits)})")
+        print(f"   - intervention_id: {intervention_id}")
+        print(f"   - planned_duration_days: {planned_duration_days}")
+        print(f"   - start_date: {start_date}")
+        print(f"   - cycle_phase: {cycle_phase}")
+        
         if not intake_id or not intervention_name:
+            print(f"❌ Missing required fields: intake_id={bool(intake_id)}, intervention_name={bool(intervention_name)}")
             raise HTTPException(status_code=400, detail="intake_id and intervention_name are required")
         
         # Fetch cycle phase from database if not provided
@@ -2352,6 +2371,7 @@ async def start_intervention_period(
                 # Continue without cycle_phase
         
         # Start intervention period
+        print(f"🔄 Calling intervention_period_service.start_intervention_period...")
         result = intervention_period_service.start_intervention_period(
             user_id=user_id,
             intake_id=intake_id,
@@ -2363,15 +2383,22 @@ async def start_intervention_period(
             cycle_phase=cycle_phase
         )
         
+        print(f"📥 Service result: {json.dumps(result, indent=2, default=str)}")
+        
         if result["success"]:
+            print(f"✅ Intervention period started successfully: {result.get('period_id')}")
             return result
         else:
-            raise HTTPException(status_code=500, detail=result.get("error", "Failed to start intervention period"))
+            error_msg = result.get("error", "Failed to start intervention period")
+            print(f"❌ Service returned error: {error_msg}")
+            raise HTTPException(status_code=500, detail=error_msg)
             
     except HTTPException:
         raise
     except Exception as e:
         print(f"❌ Error starting intervention period: {e}")
+        import traceback
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/intervention-periods/active")

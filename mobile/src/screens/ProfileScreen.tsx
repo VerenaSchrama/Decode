@@ -30,30 +30,48 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
   }, [user, session]);
 
   const handleDeleteAccount = () => {
+    console.log('🗑️ Delete account button pressed');
+    console.log('Session available:', !!session?.access_token);
+    
+    if (!session?.access_token) {
+      Alert.alert(
+        'Error',
+        'You must be logged in to delete your account. Please sign in and try again.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     Alert.alert(
       'Delete Account',
       'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.',
       [
         {
           text: 'Cancel',
-          style: 'cancel'
+          style: 'cancel',
+          onPress: () => console.log('❌ Delete account cancelled')
         },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            console.log('🗑️ User confirmed account deletion');
             try {
               // Call delete account API
+              console.log('🔄 Calling delete account API...');
               await deleteUserAccount();
+              console.log('✅ Account deleted successfully');
               
               // Logout will automatically redirect to sign in screen
               // The App.tsx will detect isAuthenticated=false and show AuthNavigator
+              console.log('🔄 Logging out...');
               await logout();
+              console.log('✅ Logout complete');
             } catch (error) {
-              console.error('Error deleting account:', error);
+              console.error('❌ Error deleting account:', error);
               Alert.alert(
                 'Error', 
-                'Failed to delete account. Please try again or contact support.',
+                `Failed to delete account: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again or contact support.`,
                 [{ text: 'OK' }]
               );
             }
@@ -340,9 +358,19 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
           onPress={handleDeleteAccount}
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          disabled={!session?.access_token}
         >
-          <Ionicons name="trash" size={20} color="#EF4444" />
-          <Text style={styles.deleteAccountText}>Delete Account</Text>
+          <Ionicons 
+            name="trash" 
+            size={20} 
+            color={session?.access_token ? "#EF4444" : "#D1D5DB"} 
+          />
+          <Text style={[
+            styles.deleteAccountText,
+            !session?.access_token && styles.deleteAccountTextDisabled
+          ]}>
+            Delete Account
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -587,5 +615,8 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     marginLeft: 8,
     fontWeight: '500',
+  },
+  deleteAccountTextDisabled: {
+    color: '#D1D5DB',
   },
 });
