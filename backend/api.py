@@ -65,9 +65,28 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+# Global OPTIONS handler for all routes (fallback if middleware doesn't catch it)
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str, request: Request):
+    """Handle CORS preflight requests for all endpoints"""
+    origin = request.headers.get("origin")
+    if origin in origins:
+        return Response(
+            status_code=204,
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                "Access-Control-Max-Age": "86400",
+            },
+        )
+    return Response(status_code=403)
 
 # Response models
 class Intervention(BaseModel):
@@ -433,7 +452,7 @@ async def recommend_intervention(user_input: UserInput, authorization: str = Hea
             result = await process_structured_user_input_async(user_input)
         except Exception as _e:
             # Fallback to sync version if async path fails
-        result = process_structured_user_input(user_input)
+            result = process_structured_user_input(user_input)
         
         # Check if there's an error
         if "error" in result:
@@ -1565,13 +1584,13 @@ async def send_chat_message(request: ChatRequest, authorization: str = Header(No
             phase_result = await cycle_service.get_current_phase(user_id)
             
             if phase_result.get('success'):
-                    cycle_phase_info = {
+                cycle_phase_info = {
                     'phase': phase_result.get('current_phase'),
                     'day': phase_result.get('days_since_period'),
                     'description': f"You are currently on day {phase_result.get('days_since_period')} of your cycle in the {phase_result.get('current_phase')} phase"
                 }
                 print(f"Fetched cycle phase from database: {cycle_phase_info}")
-                except Exception as e:
+        except Exception as e:
             print(f"Error fetching cycle phase: {e}")
         
         # Build user context for the chat
@@ -1904,27 +1923,27 @@ INSTRUCTIONS:
             "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-            # CORS headers (middleware should add these too, but we include explicitly for proxies)
-            "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            # CORS headers are handled by middleware, but we include for streaming responses
+            # Note: Don't set Access-Control-Allow-Origin here - let middleware handle it
         },
     )
 
 @app.options("/chat/stream")
-async def chat_stream_preflight() -> Response:
+async def chat_stream_preflight(request: Request) -> Response:
     """Handle CORS preflight for the streaming endpoint."""
-    return Response(
-        status_code=204,
-        headers={
-            "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Max-Age": "86400",
-        },
-    )
+    origin = request.headers.get("origin")
+    if origin in origins:
+        return Response(
+            status_code=204,
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Max-Age": "86400",
+            },
+        )
+    return Response(status_code=403)
 
 @app.get("/chat/history")
 async def get_chat_history(authorization: str = Header(None), limit: int = 50):
@@ -2816,17 +2835,21 @@ async def get_user_interventions(user_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get user interventions: {str(e)}")
 
 @app.options("/user/{user_id}/session-data")
-async def session_data_preflight(user_id: str):
-    return Response(
-        status_code=204,
-        headers={
-            "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Max-Age": "86400",
-        },
-    )
+async def session_data_preflight(user_id: str, request: Request):
+    """Handle CORS preflight for session data endpoint"""
+    origin = request.headers.get("origin")
+    if origin in origins:
+        return Response(
+            status_code=204,
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Max-Age": "86400",
+            },
+        )
+    return Response(status_code=403)
 
 @app.get("/user/{user_id}/session-data")
 async def get_user_session_data(user_id: str):
@@ -2946,7 +2969,7 @@ async def get_user_session_data(user_id: str):
                 "session_data": session_data
             },
             headers={
-                "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
+                # CORS headers handled by middleware
                 "Access-Control-Allow-Credentials": "true",
             }
         )
@@ -2957,7 +2980,7 @@ async def get_user_session_data(user_id: str):
             status_code=500,
             content={"detail": f"Error getting user session data: {str(e)}"},
             headers={
-                "Access-Control-Allow-Origin": ",".join(origins) if origins else "*",
+                # CORS headers handled by middleware
                 "Access-Control-Allow-Credentials": "true",
             }
         )
