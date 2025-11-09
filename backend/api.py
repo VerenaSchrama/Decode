@@ -2401,6 +2401,104 @@ async def start_intervention_period(
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+@app.post("/intervention-periods/reset")
+async def reset_intervention_period(
+    request: dict,
+    authorization: str = Header(None)
+):
+    """
+    Reset/change user's active intervention period
+    
+    This endpoint:
+    1. Marks the current active intervention as 'abandoned'
+    2. Deactivates old habits
+    3. Creates a new intervention period with the selected intervention
+    4. Creates new user_habits for selected habits
+    
+    Request body:
+    - intervention_id: int (from InterventionsBASE)
+    - intervention_name: str
+    - selected_habits: List[str]
+    - planned_duration_days: int (default: 30)
+    - start_date: str (ISO format, optional - defaults to now)
+    - cycle_phase: str (optional - will be fetched if not provided)
+    """
+    try:
+        from intervention_period_service import InterventionPeriodService
+        intervention_period_service = InterventionPeriodService()
+        from auth_service import AuthService
+        
+        # Extract user ID from authentication token
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Extract data from request
+        intervention_id = request.get("intervention_id")
+        intervention_name = request.get("intervention_name")
+        selected_habits = request.get("selected_habits", [])
+        planned_duration_days = request.get("planned_duration_days", 30)
+        start_date = request.get("start_date")
+        cycle_phase = request.get("cycle_phase")
+        intake_id = request.get("intake_id")  # Optional - will reuse existing if not provided
+        
+        if not intervention_name:
+            raise HTTPException(status_code=400, detail="intervention_name is required")
+        
+        if not selected_habits or len(selected_habits) == 0:
+            raise HTTPException(status_code=400, detail="selected_habits is required and cannot be empty")
+        
+        # Fetch cycle phase from database if not provided
+        if not cycle_phase:
+            try:
+                from models import supabase_client
+                from services.cycle_phase_service import get_cycle_phase_service
+                cycle_service = get_cycle_phase_service()
+                phase_result = await cycle_service.get_current_phase(user_id)
+                if phase_result.get('success'):
+                    cycle_phase = phase_result.get('current_phase')
+            except Exception as e:
+                print(f"⚠️ Failed to fetch cycle phase: {e}")
+                # Continue without cycle_phase
+        
+        # Reset intervention period
+        result = intervention_period_service.reset_intervention_period(
+            user_id=user_id,
+            intervention_id=intervention_id,
+            intervention_name=intervention_name,
+            selected_habits=selected_habits,
+            planned_duration_days=planned_duration_days,
+            start_date=start_date,
+            cycle_phase=cycle_phase,
+            intake_id=intake_id
+        )
+        
+        if result.get("success"):
+            return result
+        else:
+            error_msg = result.get("error", "Failed to reset intervention period")
+            raise HTTPException(status_code=500, detail=error_msg)
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error resetting intervention period: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 @app.get("/intervention-periods/active")
 async def get_active_intervention_period(authorization: str = Header(None)):
     """Get the currently active intervention period for the user"""

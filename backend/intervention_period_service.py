@@ -232,6 +232,141 @@ class InterventionPeriodService:
                 "periods": []
             }
     
+    def reset_intervention_period(
+        self,
+        user_id: str,
+        intervention_id: Optional[int],
+        intervention_name: str,
+        selected_habits: List[str],
+        planned_duration_days: int = 30,
+        start_date: Optional[str] = None,
+        cycle_phase: Optional[str] = None,
+        intake_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Reset/change user's active intervention period
+        
+        Steps:
+        1. Mark current active intervention period as 'abandoned'
+        2. Deactivate old habits (set status to 'completed')
+        3. Create new intervention period
+        4. Create new user_habits for selected habits
+        
+        Args:
+            user_id: User ID
+            intervention_id: Intervention ID from InterventionsBASE
+            intervention_name: Name of the new intervention
+            selected_habits: List of habit names to track
+            planned_duration_days: Duration of the intervention period
+            start_date: Start date (ISO format string) - defaults to now
+            cycle_phase: Current cycle phase
+            intake_id: Intake ID (reuse existing or create new)
+        
+        Returns:
+            Dict with success status and new period_id
+        """
+        try:
+            # Step 1: Get and mark current active intervention as abandoned
+            active_period_result = self.supabase.client.table('intervention_periods')\
+                .select('id, selected_habits')\
+                .eq('user_id', user_id)\
+                .eq('status', 'active')\
+                .execute()
+            
+            if active_period_result.data and len(active_period_result.data) > 0:
+                old_period = active_period_result.data[0]
+                old_period_id = old_period['id']
+                old_habits = old_period.get('selected_habits', [])
+                
+                # Mark old period as abandoned
+                self.supabase.client.table('intervention_periods')\
+                    .update({
+                        'status': 'abandoned',
+                        'actual_end_date': datetime.now().isoformat(),
+                        'updated_at': datetime.now().isoformat(),
+                        'notes': 'Abandoned: User changed to new intervention'
+                    })\
+                    .eq('id', old_period_id)\
+                    .execute()
+                
+                print(f"✅ Marked old intervention period {old_period_id} as abandoned")
+                
+                # Step 2: Deactivate old habits
+                # Note: We only deactivate habits that were part of this specific intervention period
+                # The habits themselves are preserved in user_habits table for history
+                # Users can query habits for a period via intervention_periods.selected_habits array
+                if old_habits:
+                    try:
+                        # Mark habits as completed (preserves history, just changes status)
+                        # The intervention_periods.selected_habits array preserves which habits
+                        # were tracked during this specific period
+                        self.supabase.client.table('user_habits')\
+                            .update({
+                                'status': 'completed',
+                                'updated_at': datetime.now().isoformat()
+                            })\
+                            .eq('user_id', user_id)\
+                            .in_('habit_name', old_habits)\
+                            .execute()
+                        print(f"✅ Marked {len(old_habits)} old habits as completed (preserved for history)")
+                        print(f"   Habit names: {old_habits}")
+                        print(f"   These habits are preserved in intervention_periods.selected_habits for period {old_period_id}")
+                    except Exception as e:
+                        print(f"⚠️ Error deactivating old habits: {e}")
+                        # Don't fail the reset if habit deactivation fails
+            
+            # Step 3: Get or create intake_id
+            if not intake_id:
+                # Get the most recent intake for this user
+                intake_result = self.supabase.client.table('intakes')\
+                    .select('id')\
+                    .eq('user_id', user_id)\
+                    .order('created_at', desc=True)\
+                    .limit(1)\
+                    .execute()
+                
+                if intake_result.data and len(intake_result.data) > 0:
+                    intake_id = intake_result.data[0]['id']
+                else:
+                    # Create a new intake record for this intervention change
+                    new_intake = {
+                        'id': str(uuid.uuid4()),
+                        'user_id': user_id,
+                        'created_at': datetime.now().isoformat(),
+                        'updated_at': datetime.now().isoformat()
+                    }
+                    intake_result = self.supabase.client.table('intakes').insert(new_intake).execute()
+                    intake_id = intake_result.data[0]['id']
+                    print(f"✅ Created new intake record: {intake_id}")
+            
+            # Step 4: Start new intervention period (reuse existing logic)
+            result = self.start_intervention_period(
+                user_id=user_id,
+                intake_id=intake_id,
+                intervention_name=intervention_name,
+                selected_habits=selected_habits,
+                intervention_id=intervention_id,
+                planned_duration_days=planned_duration_days,
+                start_date=start_date,
+                cycle_phase=cycle_phase
+            )
+            
+            if result.get('success'):
+                result['message'] = f"Successfully changed intervention from previous to {intervention_name}"
+                result['old_period_abandoned'] = active_period_result.data is not None and len(active_period_result.data) > 0
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Error resetting intervention period: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Failed to reset intervention"
+            }
+    
     def get_active_intervention_period(self, user_id: str) -> Dict[str, Any]:
         """Get the currently active intervention period for a user"""
         
