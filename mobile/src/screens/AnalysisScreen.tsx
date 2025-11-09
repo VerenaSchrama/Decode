@@ -480,13 +480,15 @@ export default function AnalysisScreen({
                 <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
                 <Text style={styles.statusLabel}>Active Intervention</Text>
               </View>
-              <Text style={styles.statusValue}>{currentIntervention.name}</Text>
-              <TouchableOpacity 
-                style={styles.readMoreButton}
-                onPress={() => setShowInterventionModal(true)}
-              >
-                <Text style={styles.readMoreButtonText}>Read more</Text>
-              </TouchableOpacity>
+              <View style={styles.interventionNameRow}>
+                <Text style={styles.statusValue}>{currentIntervention.name}</Text>
+                <TouchableOpacity 
+                  style={styles.infoButton}
+                  onPress={() => setShowInterventionModal(true)}
+                >
+                  <Ionicons name="information-circle" size={20} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -687,23 +689,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
     marginBottom: 4,
+    flex: 1,
   },
   statusDescription: {
     fontSize: 14,
     color: '#6b7280',
     marginBottom: 12,
   },
-  readMoreButton: {
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignSelf: 'flex-start',
+  interventionNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
   },
-  readMoreButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.primary,
-    textDecorationLine: 'underline',
+  infoButton: {
+    padding: 4,
+    marginLeft: 8,
   },
   changeInterventionButton: {
     marginTop: 8,
