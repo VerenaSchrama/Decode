@@ -45,11 +45,17 @@ export default function ProfileScreen({ route }: ProfileScreenProps) {
             try {
               // Call delete account API
               await deleteUserAccount();
-              // Logout will be handled after account deletion
+              
+              // Logout will automatically redirect to sign in screen
+              // The App.tsx will detect isAuthenticated=false and show AuthNavigator
               await logout();
             } catch (error) {
               console.error('Error deleting account:', error);
-              Alert.alert('Error', 'Failed to delete account. Please try again.');
+              Alert.alert(
+                'Error', 
+                'Failed to delete account. Please try again or contact support.',
+                [{ text: 'OK' }]
+              );
             }
           }
         }
