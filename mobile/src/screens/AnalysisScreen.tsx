@@ -458,8 +458,20 @@ export default function AnalysisScreen({
 
         {/* Current Status Overview */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Your Current Intervention</Text>
-        
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Your Current Intervention</Text>
+            {currentIntervention && (
+              <TouchableOpacity 
+                style={styles.changeInterventionButtonTop}
+                onPress={() => {
+                  // Navigate to recommendations screen to change intervention
+                  updateCurrentScreen('recommendations');
+                }}
+              >
+                <Text style={styles.changeInterventionButtonText}>Change your intervention</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Current Intervention */}
           {currentIntervention && (
@@ -474,15 +486,6 @@ export default function AnalysisScreen({
                 onPress={() => setShowInterventionModal(true)}
               >
                 <Text style={styles.readMoreButtonText}>Read more</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.changeInterventionButton}
-                onPress={() => {
-                  // Navigate to recommendations screen to change intervention
-                  updateCurrentScreen('recommendations');
-                }}
-              >
-                <Text style={styles.changeInterventionButtonText}>Change your intervention</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -648,11 +651,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 16,
+    flex: 1,
   },
   statusItem: {
     marginBottom: 16,
@@ -703,6 +712,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 8,
     alignSelf: 'flex-start',
+  },
+  changeInterventionButtonTop: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    marginLeft: 12,
   },
   changeInterventionButtonText: {
     fontSize: 14,
