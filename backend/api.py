@@ -700,7 +700,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
     try:
         from models import supabase_client
         import uuid
-        from datetime import datetime
+        from datetime import datetime, timedelta
         
         # --- Verify auth and bind Supabase context to the caller ---
         if not authorization or not authorization.startswith("Bearer "):
@@ -732,6 +732,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             print(f"⚠️ set_auth failed (continuing with service client if configured): {e}")
 
         entry_date = request.get('entry_date', datetime.now().strftime('%Y-%m-%d'))
+        entry_date_dt = datetime.fromisoformat(entry_date).date()
         
         # Check if user has already tracked progress for this date
         existing_result = supabase_client.client.table('daily_summaries')\
@@ -744,6 +745,32 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 status_code=400,
                 detail=f"Daily progress already tracked for {entry_date}. Only one entry per day is allowed."
             )
+        
+        # Get active intervention period to link progress entries
+        intervention_period_id = None
+        try:
+            from intervention_period_service import intervention_period_service
+            active_period_result = intervention_period_service.get_active_intervention_period(user_id)
+            if active_period_result.get("found") and active_period_result.get("period"):
+                period = active_period_result["period"]
+                period_start = datetime.fromisoformat(period['start_date'].replace('Z', '+00:00')).date()
+                period_end = None
+                if period.get('end_date'):
+                    period_end = datetime.fromisoformat(period['end_date'].replace('Z', '+00:00')).date()
+                elif period.get('planned_duration_days'):
+                    period_end = period_start + timedelta(days=period['planned_duration_days'] - 1)
+                
+                # Check if entry_date falls within the intervention period
+                if period_end and period_start <= entry_date_dt <= period_end:
+                    intervention_period_id = period['id']
+                    print(f"✅ Linking daily progress to intervention period: {intervention_period_id}")
+                elif not period_end and period_start <= entry_date_dt:
+                    # Period has no end date yet, assume it's active
+                    intervention_period_id = period['id']
+                    print(f"✅ Linking daily progress to active intervention period: {intervention_period_id}")
+        except Exception as e:
+            print(f"⚠️ Could not determine intervention period for linking: {e}")
+            # Continue without linking - not a critical error
             
         habits = request.get('habits', [])
         mood = request.get('mood', None)
@@ -796,9 +823,12 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             daily_entry_data = {
                 'user_id': user_id,
                 'habit_id': habit_id,
-            'entry_date': entry_date,
+                'entry_date': entry_date,
                 'completed': habit.get('completed', False)
             }
+            # Add intervention_period_id if available (column may not exist yet)
+            if intervention_period_id:
+                daily_entry_data['intervention_period_id'] = intervention_period_id
             
             try:
                 result = supabase_client.client.table('daily_habit_entries').insert(daily_entry_data).execute()
@@ -824,6 +854,9 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 'cycle_phase': cycle_phase,
                 'habit_entry_ids': entry_ids
             }
+            # Add intervention_period_id if available (column may not exist yet)
+            if intervention_period_id:
+                daily_mood_data['intervention_period_id'] = intervention_period_id
             try:
                 supabase_client.client.table('daily_moods').upsert(
                     daily_mood_data,
@@ -842,11 +875,14 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'entry_date': entry_date,
             'completion_percentage': completion_percentage,
             'cycle_phase': cycle_phase,
-                'total_habits': total_habits,
+            'total_habits': total_habits,
             'completed_habits': len(completed_habits),
             'overall_mood': mood.get('mood') if mood else None,
             'overall_notes': mood.get('notes', '') if mood else None
         }
+        # Add intervention_period_id if available (column may not exist yet)
+        if intervention_period_id:
+            daily_summary_data['intervention_period_id'] = intervention_period_id
         
         try:
             summary_result = supabase_client.client.table('daily_summaries').insert(daily_summary_data).execute()
@@ -1179,7 +1215,12 @@ async def get_user_analytics(user_id: str, days: int = 30):
         )
 
 @app.get("/user/{user_id}/daily-habits-history")
-async def get_daily_habits_history(user_id: str, days: int = 30):
+async def get_daily_habits_history(
+    user_id: str, 
+    days: Optional[int] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
     """
     Get daily habits history optimized for the daily habits screen UI
     
@@ -1188,7 +1229,9 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
     
     Args:
         user_id: User ID
-        days: Number of days to retrieve (default: 30)
+        days: Number of days to retrieve (default: 30, ignored if start_date/end_date provided)
+        start_date: Optional start date in YYYY-MM-DD format
+        end_date: Optional end date in YYYY-MM-DD format
         
     Returns:
         Array of daily entries with habit details, mood, and completion data
@@ -1197,14 +1240,26 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
         from models import supabase_client
         from datetime import datetime, timedelta
         
-        # Map user_id to user_uuid (after migration)
-        # Use user_id directly for all operations
-        
-        # Use user_id directly for all operations
-        
         # Calculate date range
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=days-1)
+        if start_date and end_date:
+            # Use provided date range
+            start_date_dt = datetime.fromisoformat(start_date).date()
+            end_date_dt = datetime.fromisoformat(end_date).date()
+        elif start_date:
+            # Only start_date provided, use days or default to 30
+            start_date_dt = datetime.fromisoformat(start_date).date()
+            days_to_use = days if days else 30
+            end_date_dt = start_date_dt + timedelta(days=days_to_use-1)
+        elif end_date:
+            # Only end_date provided, use days or default to 30
+            end_date_dt = datetime.fromisoformat(end_date).date()
+            days_to_use = days if days else 30
+            start_date_dt = end_date_dt - timedelta(days=days_to_use-1)
+        else:
+            # Use days parameter (default: 30)
+            days_to_use = days if days else 30
+            end_date_dt = datetime.now().date()
+            start_date_dt = end_date_dt - timedelta(days=days_to_use-1)
         
         # Query daily summaries with habit details
         try:
@@ -1212,8 +1267,8 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             summaries_result = supabase_client.client.table('daily_summaries')\
                 .select('*')\
                 .eq('user_id', user_id)\
-                .gte('entry_date', start_date.isoformat())\
-                .lte('entry_date', end_date.isoformat())\
+                .gte('entry_date', start_date_dt.isoformat())\
+                .lte('entry_date', end_date_dt.isoformat())\
                 .order('entry_date', desc=True)\
                 .execute()
             
@@ -1223,8 +1278,8 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             habit_entries_result = supabase_client.client.table('daily_habit_entries')\
                 .select('*')\
                 .eq('user_id', user_id)\
-                .gte('entry_date', start_date.isoformat())\
-                .lte('entry_date', end_date.isoformat())\
+                .gte('entry_date', start_date_dt.isoformat())\
+                .lte('entry_date', end_date_dt.isoformat())\
                 .order('entry_date', desc=True)\
                 .execute()
             
@@ -1268,8 +1323,8 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             moods_result = supabase_client.client.table('daily_moods')\
                 .select('*')\
                 .eq('user_id', user_id)\
-                .gte('entry_date', start_date.isoformat())\
-                .lte('entry_date', end_date.isoformat())\
+                .gte('entry_date', start_date_dt.isoformat())\
+                .lte('entry_date', end_date_dt.isoformat())\
                 .execute()
             
             for mood_entry in moods_result.data:
@@ -1311,8 +1366,8 @@ async def get_daily_habits_history(user_id: str, days: int = 30):
             "user_id": user_id,
             "entries": history_entries,
             "date_range": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat()
+                "start_date": start_date_dt.isoformat(),
+                "end_date": end_date_dt.isoformat()
             },
             "total_entries": len(history_entries)
         }
@@ -2374,6 +2429,186 @@ async def get_intervention_periods_history(authorization: str = Header(None)):
         print(f"❌ Error getting intervention history: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+@app.get("/intervention-periods/{period_id}/progress")
+async def get_intervention_period_progress(
+    period_id: str,
+    authorization: str = Header(None)
+):
+    """
+    Get progress metrics for a specific intervention period
+    
+    Returns:
+    - Average mood (calculated from all tracked moods in the period)
+    - Days passed vs total period days
+    - Number of days with fully completed habits
+    - Uses intervention_period_id link for accurate filtering (if available)
+    """
+    try:
+        from models import supabase_client
+        from datetime import datetime, timedelta
+        from auth_service import AuthService
+        
+        # Verify authentication
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                access_token = authorization.split(" ")[1]
+                auth_service = AuthService()
+                user_info = await auth_service.verify_token(access_token)
+                if user_info and user_info.get("success"):
+                    user_id = user_info["user_id"]
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"❌ Token verification error: {e}")
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication token required")
+        
+        # Get intervention period and verify ownership
+        try:
+            period_result = supabase_client.client.table('intervention_periods')\
+                .select('*')\
+                .eq('id', period_id)\
+                .eq('user_id', user_id)\
+                .single()\
+                .execute()
+            
+            if not period_result.data:
+                raise HTTPException(status_code=404, detail="Intervention period not found")
+            
+            period = period_result.data
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"❌ Error fetching intervention period: {e}")
+            raise HTTPException(status_code=404, detail="Intervention period not found")
+        
+        # Parse period dates
+        start_date = datetime.fromisoformat(period['start_date'].replace('Z', '+00:00')).date()
+        today = datetime.now().date()
+        
+        # Calculate end date (use actual_end_date if completed, otherwise planned end_date or calculate from duration)
+        if period.get('actual_end_date'):
+            end_date = datetime.fromisoformat(period['actual_end_date'].replace('Z', '+00:00')).date()
+        elif period.get('end_date'):
+            end_date = datetime.fromisoformat(period['end_date'].replace('Z', '+00:00')).date()
+        elif period.get('planned_duration_days'):
+            end_date = start_date + timedelta(days=period['planned_duration_days'] - 1)
+        else:
+            # Fallback: calculate from start_date + 30 days
+            end_date = start_date + timedelta(days=29)
+        
+        # Calculate days passed
+        days_passed = max(0, (min(today, end_date) - start_date).days + 1)
+        
+        # Get total days
+        total_days = (end_date - start_date).days + 1
+        
+        # Fetch progress data for this period
+        # Try to use intervention_period_id if the column exists, otherwise fall back to date filtering
+        try:
+            # Try filtering by intervention_period_id first (if migration has been applied)
+            summaries_result = supabase_client.client.table('daily_summaries')\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .eq('intervention_period_id', period_id)\
+                .order('entry_date', desc=False)\
+                .execute()
+            
+            # If no results with intervention_period_id, fall back to date filtering
+            if not summaries_result.data:
+                summaries_result = supabase_client.client.table('daily_summaries')\
+                    .select('*')\
+                    .eq('user_id', user_id)\
+                    .gte('entry_date', start_date.isoformat())\
+                    .lte('entry_date', min(today, end_date).isoformat())\
+                    .order('entry_date', desc=False)\
+                    .execute()
+        except Exception as e:
+            # Column might not exist yet, fall back to date filtering
+            print(f"⚠️ intervention_period_id column may not exist, using date filtering: {e}")
+            summaries_result = supabase_client.client.table('daily_summaries')\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', min(today, end_date).isoformat())\
+                .order('entry_date', desc=False)\
+                .execute()
+        
+        summaries = summaries_result.data if summaries_result.data else []
+        
+        # Fetch mood data
+        try:
+            # Try filtering by intervention_period_id first
+            moods_result = supabase_client.client.table('daily_moods')\
+                .select('entry_date, mood')\
+                .eq('user_id', user_id)\
+                .eq('intervention_period_id', period_id)\
+                .order('entry_date', desc=False)\
+                .execute()
+            
+            if not moods_result.data:
+                moods_result = supabase_client.client.table('daily_moods')\
+                    .select('entry_date, mood')\
+                    .eq('user_id', user_id)\
+                    .gte('entry_date', start_date.isoformat())\
+                    .lte('entry_date', min(today, end_date).isoformat())\
+                    .order('entry_date', desc=False)\
+                    .execute()
+        except Exception as e:
+            # Column might not exist yet, fall back to date filtering
+            moods_result = supabase_client.client.table('daily_moods')\
+                .select('entry_date, mood')\
+                .eq('user_id', user_id)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', min(today, end_date).isoformat())\
+                .order('entry_date', desc=False)\
+                .execute()
+        
+        moods = moods_result.data if moods_result.data else []
+        
+        # Calculate metrics
+        # 1. Average mood
+        mood_values = [m['mood'] for m in moods if m.get('mood') is not None]
+        average_mood = sum(mood_values) / len(mood_values) if mood_values else None
+        
+        # 2. Fully completed days (100% completion)
+        fully_completed_days = len([s for s in summaries if s.get('completion_percentage') == 100])
+        
+        # 3. Tracked days (days with any progress entry)
+        tracked_days = len(summaries)
+        
+        return {
+            "success": True,
+            "period_id": period_id,
+            "intervention_name": period.get('intervention_name'),
+            "metrics": {
+                "average_mood": round(average_mood, 2) if average_mood else None,
+                "days_passed": days_passed,
+                "total_days": total_days,
+                "fully_completed_days": fully_completed_days,
+                "tracked_days": tracked_days,
+                "completion_rate": round((fully_completed_days / total_days * 100), 1) if total_days > 0 else 0
+            },
+            "period_info": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "status": period.get('status'),
+                "selected_habits": period.get('selected_habits', [])
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting intervention period progress: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 @app.put("/intervention-periods/{period_id}/complete")
 async def complete_intervention_period(
     period_id: str,
@@ -2663,10 +2898,11 @@ async def get_user_session_data(user_id: str):
             if period_result.data:
                 period = period_result.data[0]
                 session_data["current_intervention"] = {
-                    "id": period['intervention_id'],
+                    "id": period.get('intervention_id'),
                     "name": period['intervention_name'],
                     "start_date": period['start_date'],
-                    "planned_end_date": period['planned_end_date']
+                    "end_date": period.get('end_date'),
+                    "planned_duration_days": period.get('planned_duration_days', 30),
                     # Note: cycle_phase_at_start and completion_percentage removed - columns don't exist in Supabase table
                 }
                 session_data["selected_habits"] = period.get('selected_habits', [])

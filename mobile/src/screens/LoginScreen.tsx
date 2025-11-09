@@ -82,8 +82,8 @@ export default function LoginScreen({ onNavigateToRegister, onLoginSuccess }: Lo
             <View style={styles.logoContainer}>
               <Ionicons name="leaf" size={48} color={colors.primary} />
             </View>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to continue your wellness journey</Text>
+            <Text style={styles.title}>Welcome Back!</Text>
+            <Text style={styles.subtitle}>Sign in to continue decoding your food habits</Text>
           </View>
 
           {/* Form */}
@@ -169,7 +169,7 @@ export default function LoginScreen({ onNavigateToRegister, onLoginSuccess }: Lo
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
+            <Text style={styles.footerText}>Don't have an account yet? </Text>
             <TouchableOpacity onPress={onNavigateToRegister}>
               <Text style={styles.footerLink}>Sign Up</Text>
             </TouchableOpacity>

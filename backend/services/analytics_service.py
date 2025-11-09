@@ -59,24 +59,65 @@ def generate_completion_summary(event_data: Dict[str, Any]) -> Dict[str, Any]:
         total_habits = len(selected_habits)
         
         # 2. Get daily summaries for the period
-        summaries_result = supabase_client.client.table('daily_summaries')\
-            .select('entry_date, completion_percentage, total_habits, completed_habits')\
-            .eq('user_id', user_id)\
-            .gte('entry_date', start_date.isoformat())\
-            .lte('entry_date', end_date.isoformat())\
-            .order('entry_date', desc=False)\
-            .execute()
+        # Try to use intervention_period_id for accurate filtering, fall back to date filtering
+        try:
+            summaries_result = supabase_client.client.table('daily_summaries')\
+                .select('entry_date, completion_percentage, total_habits, completed_habits')\
+                .eq('user_id', user_id)\
+                .eq('intervention_period_id', period_id)\
+                .order('entry_date', desc=False)\
+                .execute()
+            
+            # If no results with intervention_period_id, fall back to date filtering
+            if not summaries_result.data:
+                summaries_result = supabase_client.client.table('daily_summaries')\
+                    .select('entry_date, completion_percentage, total_habits, completed_habits')\
+                    .eq('user_id', user_id)\
+                    .gte('entry_date', start_date.isoformat())\
+                    .lte('entry_date', end_date.isoformat())\
+                    .order('entry_date', desc=False)\
+                    .execute()
+        except Exception as e:
+            # Column might not exist yet, fall back to date filtering
+            logger.warning(f"⚠️ intervention_period_id column may not exist, using date filtering: {e}")
+            summaries_result = supabase_client.client.table('daily_summaries')\
+                .select('entry_date, completion_percentage, total_habits, completed_habits')\
+                .eq('user_id', user_id)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', end_date.isoformat())\
+                .order('entry_date', desc=False)\
+                .execute()
         
         summaries = summaries_result.data if summaries_result.data else []
         
         # 3. Get mood data for the period
-        moods_result = supabase_client.client.table('daily_moods')\
-            .select('entry_date, mood')\
-            .eq('user_id', user_id)\
-            .gte('entry_date', start_date.isoformat())\
-            .lte('entry_date', end_date.isoformat())\
-            .order('entry_date', desc=False)\
-            .execute()
+        # Try to use intervention_period_id for accurate filtering, fall back to date filtering
+        try:
+            moods_result = supabase_client.client.table('daily_moods')\
+                .select('entry_date, mood')\
+                .eq('user_id', user_id)\
+                .eq('intervention_period_id', period_id)\
+                .order('entry_date', desc=False)\
+                .execute()
+            
+            if not moods_result.data:
+                moods_result = supabase_client.client.table('daily_moods')\
+                    .select('entry_date, mood')\
+                    .eq('user_id', user_id)\
+                    .gte('entry_date', start_date.isoformat())\
+                    .lte('entry_date', end_date.isoformat())\
+                    .order('entry_date', desc=False)\
+                    .execute()
+        except Exception as e:
+            # Column might not exist yet, fall back to date filtering
+            logger.warning(f"⚠️ intervention_period_id column may not exist, using date filtering: {e}")
+            moods_result = supabase_client.client.table('daily_moods')\
+                .select('entry_date, mood')\
+                .eq('user_id', user_id)\
+                .gte('entry_date', start_date.isoformat())\
+                .lte('entry_date', end_date.isoformat())\
+                .order('entry_date', desc=False)\
+                .execute()
         
         moods = moods_result.data if moods_result.data else []
         moods_by_date = {m['entry_date']: m.get('mood') for m in moods if m.get('mood') is not None}

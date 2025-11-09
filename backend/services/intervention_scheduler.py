@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 async def auto_complete_expired_periods() -> Dict[str, Any]:
     """
-    Auto-complete intervention periods that have passed their planned_end_date
+    Auto-complete intervention periods that have passed their end_date (planned end date)
     
     Returns:
         Dictionary with completion results
@@ -23,7 +23,7 @@ async def auto_complete_expired_periods() -> Dict[str, Any]:
         today = date.today()
         logger.info(f"🔄 Checking for expired intervention periods (today: {today})")
         
-        # Find all active periods past their planned_end_date
+        # Find all active periods past their end_date (planned end date)
         expired_result = supabase_client.client.table('intervention_periods')\
             .select('id, user_id, intervention_name, end_date')\
             .eq('status', 'active')\

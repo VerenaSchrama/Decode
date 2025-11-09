@@ -17,11 +17,20 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Get credentials
-read -p "Enter your Bearer token: " ACCESS_TOKEN
+# Get credentials (from environment variable or prompt)
 if [ -z "$ACCESS_TOKEN" ]; then
-    echo -e "${RED}❌ Access token required${NC}"
-    exit 1
+    read -p "Enter your Bearer token: " ACCESS_TOKEN
+    if [ -z "$ACCESS_TOKEN" ]; then
+        echo -e "${RED}❌ Access token required${NC}"
+        echo ""
+        echo "Usage:"
+        echo "  export ACCESS_TOKEN='your-token' && ./test_completion_flow.sh"
+        echo "  OR"
+        echo "  ./test_completion_flow.sh  (will prompt for token)"
+        exit 1
+    fi
+else
+    echo "✅ Using ACCESS_TOKEN from environment"
 fi
 
 echo ""

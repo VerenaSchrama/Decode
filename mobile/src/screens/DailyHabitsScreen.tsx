@@ -753,14 +753,6 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           />
         )}
 
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Daily Habits</Text>
-          <Text style={styles.subtitle}>
-            Track your progress and mood today
-          </Text>
-        </View>
-
         {/* Enhanced Current Phase Info */}
         {cyclePhase && (
           <View style={styles.phaseInfoCard}>
