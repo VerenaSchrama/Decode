@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
@@ -15,6 +16,7 @@ import { interventionPeriodService } from '../services/interventionPeriodService
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiService } from '../services/apiService';
+import { useAppState } from '../contexts/AppStateContext';
 
 interface AnalysisScreenProps {
   intakeData?: any;
@@ -30,7 +32,9 @@ export default function AnalysisScreen({
   onNavigateToChat,
 }: AnalysisScreenProps) {
   const { user, session } = useAuth();
+  const { updateCurrentScreen } = useAppState();
   const [showCustomIntervention, setShowCustomIntervention] = useState(false);
+  const [showInterventionModal, setShowInterventionModal] = useState(false);
   
   // Progress metrics state
   const [progressMetrics, setProgressMetrics] = useState<{
@@ -229,6 +233,86 @@ export default function AnalysisScreen({
   }
 
   return (
+    <>
+      {/* Intervention Details Modal */}
+      <Modal
+        visible={showInterventionModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowInterventionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{currentIntervention?.name || 'Intervention Details'}</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowInterventionModal(false)}
+              >
+                <Ionicons name="close" size={24} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              {/* Intervention Explanation/Description */}
+              {currentIntervention?.profile_match && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>About this intervention</Text>
+                  <Text style={styles.modalSectionText}>{currentIntervention.profile_match}</Text>
+                </View>
+              )}
+              
+              {/* Why Recommended */}
+              {currentIntervention?.why_recommended && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Why this is recommended</Text>
+                  <Text style={styles.modalSectionText}>{currentIntervention.why_recommended}</Text>
+                </View>
+              )}
+              
+              {/* What You'll Be Doing */}
+              {currentIntervention?.what_will_you_be_doing && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>What you'll be doing</Text>
+                  <Text style={styles.modalSectionText}>{currentIntervention.what_will_you_be_doing}</Text>
+                </View>
+              )}
+              
+              {/* Habits */}
+              {currentIntervention?.habits && currentIntervention.habits.length > 0 && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Habits to track</Text>
+                  {currentIntervention.habits.map((habit: any, index: number) => (
+                    <View key={index} style={styles.modalHabitItem}>
+                      <Text style={styles.modalHabitNumber}>{index + 1}.</Text>
+                      <Text style={styles.modalHabitText}>
+                        {typeof habit === 'string' ? habit : habit.description}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              
+              {/* Scientific Source */}
+              {currentIntervention?.scientific_source && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Scientific source</Text>
+                  <Text style={styles.modalSectionText}>{currentIntervention.scientific_source}</Text>
+                </View>
+              )}
+            </ScrollView>
+            
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCloseButtonLarge}
+                onPress={() => setShowInterventionModal(false)}
+              >
+                <Text style={styles.modalCloseButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Intervention Progress */}
@@ -374,19 +458,8 @@ export default function AnalysisScreen({
 
         {/* Current Status Overview */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Your Current Status</Text>
-          
-          {/* Cycle Phase */}
-          {cycleInfo && (
-            <View style={styles.statusItem}>
-              <View style={styles.statusHeader}>
-                <View style={[styles.statusDot, { backgroundColor: cycleInfo.color }]} />
-                <Text style={styles.statusLabel}>Current Phase</Text>
-              </View>
-              <Text style={styles.statusValue}>{cycleInfo.phase}</Text>
-              <Text style={styles.statusDescription}>{cycleInfo.description}</Text>
-            </View>
-          )}
+          <Text style={styles.cardTitle}>Your Current Intervention</Text>
+        
 
           {/* Current Intervention */}
           {currentIntervention && (
@@ -396,9 +469,21 @@ export default function AnalysisScreen({
                 <Text style={styles.statusLabel}>Active Intervention</Text>
               </View>
               <Text style={styles.statusValue}>{currentIntervention.name}</Text>
-              <Text style={styles.statusDescription}>
-                {currentIntervention.habits?.length || 0} habits to track
-              </Text>
+              <TouchableOpacity 
+                style={styles.readMoreButton}
+                onPress={() => setShowInterventionModal(true)}
+              >
+                <Text style={styles.readMoreButtonText}>Read more</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.changeInterventionButton}
+                onPress={() => {
+                  // Navigate to recommendations screen to change intervention
+                  updateCurrentScreen('recommendations');
+                }}
+              >
+                <Text style={styles.changeInterventionButtonText}>Change your intervention</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -472,6 +557,7 @@ export default function AnalysisScreen({
         )}
       </ScrollView>
     </SafeAreaView>
+    </>
   );
 }
 
@@ -596,6 +682,121 @@ const styles = StyleSheet.create({
   statusDescription: {
     fontSize: 14,
     color: '#6b7280',
+    marginBottom: 12,
+  },
+  readMoreButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+  },
+  readMoreButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.primary,
+    textDecorationLine: 'underline',
+  },
+  changeInterventionButton: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  changeInterventionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  // Intervention Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    width: '90%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    flex: 1,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalScrollView: {
+    maxHeight: 400,
+  },
+  modalSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  modalSectionText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 22,
+  },
+  modalHabitItem: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    alignItems: 'flex-start',
+  },
+  modalHabitNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    marginRight: 8,
+    minWidth: 24,
+  },
+  modalHabitText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 22,
+    flex: 1,
+  },
+  modalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  modalCloseButtonLarge: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalCloseButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   profileItem: {
     marginBottom: 12,

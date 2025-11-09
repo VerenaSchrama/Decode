@@ -900,36 +900,6 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
               </TouchableOpacity>
             )}
           </View>
-
-          {/* Completion Status */}
-          <View style={styles.trackingCompletionStatus}>
-            <View style={styles.trackingStatusItem}>
-              <Ionicons 
-                name={completedCount > 0 ? "checkmark-circle" : "ellipse-outline"} 
-                size={20} 
-                color={completedCount > 0 ? colors.success : colors.textSecondary} 
-              />
-              <Text style={[
-                styles.trackingStatusText,
-                completedCount > 0 && styles.trackingStatusTextCompleted
-              ]}>
-                Habits tracked ({completedCount}/{totalHabits})
-              </Text>
-            </View>
-            <View style={styles.trackingStatusItem}>
-              <Ionicons 
-                name={moodEntry ? "checkmark-circle" : "ellipse-outline"} 
-                size={20} 
-                color={moodEntry ? colors.success : colors.textSecondary} 
-              />
-              <Text style={[
-                styles.trackingStatusText,
-                moodEntry && styles.trackingStatusTextCompleted
-              ]}>
-                Mood tracked
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* Mood Tracking Modal */}
@@ -2052,27 +2022,6 @@ const styles = StyleSheet.create({
   },
   trackingMoodTextLocked: {
     color: '#9CA3AF',
-  },
-  trackingCompletionStatus: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  trackingStatusItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  trackingStatusText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 8,
-  },
-  trackingStatusTextCompleted: {
-    color: colors.success,
-    fontWeight: '500',
   },
   saveButtonDisabled: {
     backgroundColor: '#E5E7EB',
