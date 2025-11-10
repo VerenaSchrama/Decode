@@ -89,15 +89,16 @@ class InterventionPeriodService:
                         all_habits = self.supabase.client.table('HabitsBASE').select('*').execute()
                         habit_name_to_id = {habit['Habit_Name']: habit['Habit_ID'] for habit in all_habits.data}
                         
-                        # Create user_habits entries for each selected habit
+                        # Create or reactivate user_habits entries for each selected habit
                         user_habits_data = []
+                        habits_to_reactivate = []
                         for habit_name in selected_habits:
                             habit_id = habit_name_to_id.get(habit_name)
                             
                             if habit_id:
                                 # Check if user_habit already exists
                                 existing = self.supabase.client.table('user_habits')\
-                                    .select('id')\
+                                    .select('id, status')\
                                     .eq('user_id', user_id)\
                                     .eq('habit_name', habit_name)\
                                     .execute()
@@ -114,16 +115,34 @@ class InterventionPeriodService:
                                         'updated_at': datetime.now().isoformat()
                                     }
                                     user_habits_data.append(user_habit_record)
-                                    print(f"✅ Creating user_habit for: {habit_name}")
+                                    print(f"✅ Creating new user_habit for: {habit_name}")
                                 else:
-                                    print(f"⚠️ user_habit already exists for: {habit_name}")
+                                    # Habit exists - check if it needs to be reactivated
+                                    existing_habit = existing.data[0]
+                                    if existing_habit.get('status') != 'active':
+                                        # Reactivate existing habit (was 'completed' or 'abandoned')
+                                        habits_to_reactivate.append(existing_habit['id'])
+                                        print(f"✅ Reactivating user_habit for: {habit_name} (was {existing_habit.get('status')})")
+                                    else:
+                                        print(f"ℹ️ user_habit already active for: {habit_name}")
                             else:
                                 print(f"⚠️ Could not find habit_id for: {habit_name}")
                         
-                        # Insert user_habits in batch if any new ones
+                        # Insert new user_habits in batch if any
                         if user_habits_data:
                             user_habits_result = self.supabase.client.table('user_habits').insert(user_habits_data).execute()
-                            print(f"✅ Created {len(user_habits_data)} user_habits entries")
+                            print(f"✅ Created {len(user_habits_data)} new user_habits entries")
+                        
+                        # Reactivate existing habits that were previously completed/abandoned
+                        if habits_to_reactivate:
+                            self.supabase.client.table('user_habits')\
+                                .update({
+                                    'status': 'active',
+                                    'updated_at': datetime.now().isoformat()
+                                })\
+                                .in_('id', habits_to_reactivate)\
+                                .execute()
+                            print(f"✅ Reactivated {len(habits_to_reactivate)} existing user_habits to active status")
                     
                     except Exception as habit_error:
                         print(f"⚠️ Error storing user_habits: {habit_error}")
