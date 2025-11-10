@@ -23,6 +23,7 @@ interface AnalysisScreenProps {
   currentIntervention?: any;
   selectedHabits?: string[];
   onNavigateToChat: () => void;
+  onNavigateToChangeIntervention?: () => void;
 }
 
 export default function AnalysisScreen({
@@ -30,6 +31,7 @@ export default function AnalysisScreen({
   currentIntervention,
   selectedHabits,
   onNavigateToChat,
+  onNavigateToChangeIntervention,
 }: AnalysisScreenProps) {
   const { user, session } = useAuth();
   const { updateCurrentScreen } = useAppState();
