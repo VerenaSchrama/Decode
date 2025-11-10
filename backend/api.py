@@ -753,17 +753,41 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         entry_date = request.get('entry_date', datetime.now().strftime('%Y-%m-%d'))
         entry_date_dt = datetime.fromisoformat(entry_date).date()
         
-        # Check if user has already tracked progress for this date
-        existing_result = supabase_client.client.table('daily_summaries')\
-            .select('id, entry_date')\
-            .eq('user_id', user_id)\
-            .eq('entry_date', entry_date)\
-            .execute()
-        if len(existing_result.data) > 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Daily progress already tracked for {entry_date}. Only one entry per day is allowed."
-            )
+        # Delete existing entries for this date before creating new ones (allows updates)
+        # This ensures only the latest update is stored for each date
+        try:
+            # Delete existing daily_habit_entries for this date
+            deleted_habit_entries = supabase_client.client.table('daily_habit_entries')\
+                .delete()\
+                .eq('user_id', user_id)\
+                .eq('entry_date', entry_date)\
+                .execute()
+            if deleted_habit_entries.data:
+                print(f"🗑️ Deleted {len(deleted_habit_entries.data)} existing daily_habit_entries for {entry_date}")
+            
+            # Delete existing daily_moods for this date
+            deleted_moods = supabase_client.client.table('daily_moods')\
+                .delete()\
+                .eq('user_id', user_id)\
+                .eq('entry_date', entry_date)\
+                .execute()
+            if deleted_moods.data:
+                print(f"🗑️ Deleted {len(deleted_moods.data)} existing daily_moods for {entry_date}")
+            
+            # Delete existing daily_summaries for this date
+            deleted_summaries = supabase_client.client.table('daily_summaries')\
+                .delete()\
+                .eq('user_id', user_id)\
+                .eq('entry_date', entry_date)\
+                .execute()
+            if deleted_summaries.data:
+                print(f"🗑️ Deleted {len(deleted_summaries.data)} existing daily_summaries for {entry_date}")
+            
+            if deleted_habit_entries.data or deleted_moods.data or deleted_summaries.data:
+                print(f"✅ Cleaned up existing entries for {entry_date} before creating new ones")
+        except Exception as e:
+            print(f"⚠️ Error deleting existing entries (continuing with insert): {e}")
+            # Continue with insert even if deletion fails - worst case we'll have duplicates
         
         # Get active intervention period to link progress entries
         intervention_period_id = None
@@ -863,6 +887,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
                 # Continue with other habits even if one fails
         
         # Create daily mood entry (stored separately from habit entries, linked via habit_entry_ids)
+        # Note: Existing entries for this date have already been deleted above
         if mood:
             daily_mood_data = {
                 'user_id': user_id,
@@ -877,11 +902,9 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             if intervention_period_id:
                 daily_mood_data['intervention_period_id'] = intervention_period_id
             try:
-                supabase_client.client.table('daily_moods').upsert(
-                    daily_mood_data,
-                    { 'on_conflict': 'user_id,entry_date' }
-                ).execute()
-                print(f"✅ Created/updated daily_mood entry for {entry_date}")
+                # Use insert since we've already deleted existing entries above
+                supabase_client.client.table('daily_moods').insert(daily_mood_data).execute()
+                print(f"✅ Created daily_mood entry for {entry_date}")
             except Exception as e:
                 print(f"❌ ERROR creating daily_mood entry: {e}")
                 print(f"   Data: {daily_mood_data}")
