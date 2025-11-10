@@ -689,7 +689,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
     marginBottom: 4,
-    flex: 1,
   },
   statusDescription: {
     fontSize: 14,
@@ -703,7 +702,7 @@ const styles = StyleSheet.create({
   },
   infoButton: {
     padding: 4,
-    marginLeft: 8,
+    marginLeft: 6,
   },
   changeInterventionButton: {
     marginTop: 8,
