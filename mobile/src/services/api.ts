@@ -95,6 +95,10 @@ export const getRecommendations = async (storyIntakeData: any, accessToken?: str
       age: storyIntakeData.profile.age
     });
     
+    // If user is navigating to recommendations, they've already consented during intake
+    // Default consent to true if not explicitly set (for users changing intervention)
+    const hasConsent = storyIntakeData.consent === true || storyIntakeData.consent === undefined;
+    
     // Transform the Story Intake data to match your backend's expected format
     const userInput = {
       profile: {
@@ -114,8 +118,14 @@ export const getRecommendations = async (storyIntakeData: any, accessToken?: str
                 selected: storyIntakeData.dietaryPreferences?.selected || [],
                 additional: storyIntakeData.dietaryPreferences?.additional || '',
               },
-              consent: storyIntakeData.consent === true ? true : false, // Explicitly ensure boolean
+              consent: hasConsent ? true : false, // Default to true if undefined (user already consented during intake)
             };
+    
+    console.log('🔐 Consent check:', {
+      original: storyIntakeData.consent,
+      hasConsent,
+      final: userInput.consent
+    });
 
     console.log('📤 Sending to API:', JSON.stringify(userInput, null, 2));
     console.log('🌐 API URL:', API_BASE_URL + endpoints.recommend);
