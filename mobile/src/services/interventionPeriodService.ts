@@ -95,6 +95,56 @@ export class InterventionPeriodService {
   /**
    * Get progress metrics for a specific intervention period
    */
+  /**
+   * Reset/change user's active intervention period
+   */
+  async resetInterventionPeriod(
+    request: {
+      intervention_id?: number;
+      intervention_name: string;
+      selected_habits: string[];
+      planned_duration_days?: number;
+      start_date?: string;
+      cycle_phase?: string;
+      intake_id?: string;
+    },
+    accessToken: string
+  ): Promise<{ success: boolean; period_id?: string; message?: string; error?: string }> {
+    try {
+      console.log('🔄 InterventionPeriodService: Resetting intervention period');
+      console.log('📤 Request payload:', JSON.stringify(request, null, 2));
+      
+      const response = await api.post('/intervention-periods/reset', request, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('✅ InterventionPeriodService: Reset response status:', response.status);
+      console.log('📥 Response data:', response.data);
+
+      if (response.status === 200 && response.data.success) {
+        return {
+          success: true,
+          period_id: response.data.period_id,
+          message: response.data.message
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.detail || response.data.error || 'Failed to reset intervention period'
+        };
+      }
+    } catch (error: any) {
+      console.error('Error resetting intervention period:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.response?.data?.error || error.message || 'Failed to reset intervention period'
+      };
+    }
+  }
+
   async getInterventionPeriodProgress(
     periodId: string,
     accessToken: string

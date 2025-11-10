@@ -464,8 +464,9 @@ export default function AnalysisScreen({
               <TouchableOpacity 
                 style={styles.changeInterventionButtonTop}
                 onPress={() => {
-                  // Navigate to recommendations screen to change intervention
-                  updateCurrentScreen('recommendations');
+                  // Navigate to change intervention screen
+                  // Use a custom state flag since currentScreen type doesn't include 'change-intervention'
+                  updateCurrentScreen('change-intervention' as any);
                 }}
               >
                 <Text style={styles.changeInterventionButtonText}>Change your intervention</Text>

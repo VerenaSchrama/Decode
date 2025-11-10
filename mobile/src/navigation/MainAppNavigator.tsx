@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
@@ -12,6 +12,7 @@ import DailyHabitsScreen from '../screens/DailyHabitsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import AnalysisScreen from '../screens/AnalysisScreen';
 import NutritionistChatScreen from '../screens/NutritionistChatScreen';
+import ChangeInterventionScreen from '../screens/ChangeInterventionScreen';
 
 // Define parameter list for tab navigator
 export type MainTabParamList = {
@@ -31,7 +32,35 @@ interface MainAppNavigatorProps {
 }
 
 function DiaryStack({ intakeData, currentIntervention, selectedHabits }: { intakeData?: any; currentIntervention?: any; selectedHabits: string[] }) {
+  const { state, updateCurrentScreen } = useAppState();
   const [showChat, setShowChat] = useState(false);
+  const [showChangeIntervention, setShowChangeIntervention] = useState(false);
+
+  // Check if we should show change intervention screen
+  // Use string comparison since currentScreen type may not include 'change-intervention'
+  const shouldShowChangeIntervention = String(state.currentScreen) === 'change-intervention' || showChangeIntervention;
+  
+  // Listen for screen changes to show change intervention screen
+  React.useEffect(() => {
+    if (String(state.currentScreen) === 'change-intervention') {
+      setShowChangeIntervention(true);
+    }
+  }, [state.currentScreen]);
+
+  if (shouldShowChangeIntervention) {
+    return (
+      <ChangeInterventionScreen
+        onComplete={() => {
+          updateCurrentScreen('main-app');
+          setShowChangeIntervention(false);
+        }}
+        onCancel={() => {
+          updateCurrentScreen('main-app');
+          setShowChangeIntervention(false);
+        }}
+      />
+    );
+  }
 
   if (showChat) {
     return (

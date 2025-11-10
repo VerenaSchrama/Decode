@@ -454,6 +454,44 @@ class ApiService {
     );
   }
 
+  /**
+   * Get all available interventions
+   */
+  async getAllInterventions(): Promise<{ success: boolean; interventions?: any[]; error?: string }> {
+    try {
+      const response = await this.makeRequest<{ interventions: any[] }>('/interventions');
+      return {
+        success: true,
+        interventions: response.interventions || []
+      };
+    } catch (error: any) {
+      console.error('Error fetching interventions:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch interventions'
+      };
+    }
+  }
+
+  /**
+   * Get habits for a specific intervention
+   */
+  async getHabitsForIntervention(interventionId: number): Promise<{ success: boolean; habits?: any[]; error?: string }> {
+    try {
+      const response = await this.makeRequest<{ habits: any[] }>(`/habits/${interventionId}`);
+      return {
+        success: true,
+        habits: response.habits || []
+      };
+    } catch (error: any) {
+      console.error('Error fetching habits:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch habits'
+      };
+    }
+  }
+
   // ===== CYCLE PHASE MANAGEMENT =====
 
   /**
