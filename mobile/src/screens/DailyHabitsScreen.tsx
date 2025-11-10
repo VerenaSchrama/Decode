@@ -406,8 +406,9 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       console.log('✅ Tracking status:', statusResponse);
       setIsTodayTracked(statusResponse.is_tracked);
       
+      // If today is tracked, load the existing progress data
       if (statusResponse.is_tracked) {
-        showToast('You\'ve already tracked your progress for today!', 'info');
+        await loadTodayProgressData();
       }
     } catch (error) {
       console.error('❌ Error checking tracking status:', error);
@@ -415,6 +416,53 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       setIsTodayTracked(false);
     } finally {
       setIsCheckingStatus(false);
+    }
+  };
+
+  const loadTodayProgressData = async () => {
+    try {
+      const userId = user?.id || 'demo-user-123';
+      const today = new Date().toISOString().split('T')[0];
+      
+      console.log('🔄 Loading today\'s progress data...');
+      const response = await DailyProgressAPI.getDailyHabitsHistory(userId, 1);
+      
+      if (response.success && response.entries) {
+        // Find today's entry
+        const todayEntry = response.entries.find((entry: DailyHabitsHistoryEntry) => entry.date === today);
+        
+        if (todayEntry) {
+          console.log('✅ Found today\'s progress data:', todayEntry);
+          
+          // Populate habit progress
+          const updatedHabitProgress: HabitProgress[] = selectedHabits.map(habit => {
+            const habitEntry = todayEntry.habits.find((h: any) => h.habit_name === habit);
+            return {
+              habit,
+              completed: habitEntry?.completed || false,
+              notes: habitEntry?.notes || ''
+            };
+          });
+          setHabitProgress(updatedHabitProgress);
+          
+          // Populate mood entry if it exists
+          if (todayEntry.mood) {
+            setMoodEntry({
+              mood: todayEntry.mood.mood,
+              symptoms: todayEntry.mood.symptoms || [],
+              notes: todayEntry.mood.notes || '',
+              date: todayEntry.mood.date
+            });
+          }
+          
+          console.log('✅ Today\'s progress data loaded into form');
+        } else {
+          console.log('⚠️ No entry found for today in history');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error loading today\'s progress data:', error);
+      // Don't show error toast - this is a background operation
     }
   };
 
@@ -550,12 +598,6 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const saveProgressToAPI = async () => {
     if (isSavingProgress) return;
     
-    // Check if today is already tracked
-    if (isTodayTracked) {
-      showToast('You\'ve already tracked your progress for today!', 'warning');
-      return;
-    }
-    
     setIsSavingProgress(true);
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -572,6 +614,7 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
         date: moodEntry.date
       } : undefined;
 
+      console.log('💾 Saving daily progress (will update if entry exists)...');
       await apiService.saveDailyProgress({
         user_id: user?.id,
         entry_date: today,
@@ -592,6 +635,16 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
         setIsEditing(false);
       }
       
+      // Refresh daily habits history to show updated data
+      console.log('🔄 Refreshing daily habits history after save...');
+      await loadDailyHabitsHistory();
+      
+      // Reload today's progress data to show the updated values
+      await loadTodayProgressData();
+      
+      // Also refresh today's tracking status
+      await checkTodayTrackingStatus();
+      
       showToast('Progress saved successfully!', 'success');
 
     } catch (error) {
@@ -603,10 +656,10 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   };
 
   const toggleHabit = (habit: string) => {
-    // Don't allow toggling if today is already tracked and not in edit mode
+    // Allow toggling even if today is tracked - user can update their progress
+    // If not in edit mode, automatically enter edit mode when toggling
     if (isTodayTracked && !isEditing) {
-      showToast('You\'ve already tracked your progress for today!', 'warning');
-      return;
+      setIsEditing(true);
     }
     
     console.log('🔄 Toggling habit:', habit);
@@ -624,10 +677,10 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   };
 
   const openMoodModal = () => {
-    // Don't allow mood tracking if today is already tracked and not in edit mode
+    // Allow mood tracking even if today is tracked - user can update their progress
+    // If not in edit mode, automatically enter edit mode when opening mood modal
     if (isTodayTracked && !isEditing) {
-      showToast('You\'ve already tracked your progress for today!', 'warning');
-      return;
+      setIsEditing(true);
     }
     
     if (moodEntry) {
