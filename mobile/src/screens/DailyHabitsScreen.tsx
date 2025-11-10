@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import { RouteProp } from '@react-navigation/native';
 import { SYMPTOM_OPTIONS } from '../types/StoryIntake';
+import CalendarPicker from 'react-native-calendar-picker';
 
 // Mood tracking symptoms - only symptoms women can experience, not diagnoses
 const MOOD_SYMPTOM_OPTIONS = [
@@ -293,9 +294,13 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const [dailyEntries, setDailyEntries] = useState<DailyEntry[]>([
     // Empty for new user - will populate as they track daily habits
   ]);
-  const [showHistory, setShowHistory] = useState(false);
+  const [displayedHistoryCount, setDisplayedHistoryCount] = useState<number>(5);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [selectedDateProgress, setSelectedDateProgress] = useState<DailyEntry | null>(null);
+  const [isLoadingDateProgress, setIsLoadingDateProgress] = useState(false);
 
   // Phase tracking state
   const [cyclePhase, setCyclePhase] = useState<CyclePhaseInfo | null>(null);
@@ -463,6 +468,56 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
     } catch (error) {
       console.error('❌ Error loading today\'s progress data:', error);
       // Don't show error toast - this is a background operation
+    }
+  };
+
+  const loadDateProgress = async (date: Date) => {
+    try {
+      setIsLoadingDateProgress(true);
+      const userId = user?.id || 'demo-user-123';
+      const dateString = date.toISOString().split('T')[0];
+      
+      console.log('🔄 Loading progress for date:', dateString);
+      const response = await DailyProgressAPI.getDailyHabitsHistory(userId, 30);
+      
+      if (response.success && response.entries) {
+        // Find the entry for the selected date
+        const dateEntry = response.entries.find((entry: DailyHabitsHistoryEntry) => entry.date === dateString);
+        
+        if (dateEntry) {
+          // Convert to DailyEntry format
+          const convertedEntry: DailyEntry = {
+            id: dateEntry.id,
+            date: dateEntry.date,
+            habits: dateEntry.habits.map((habit: any) => ({
+              habit: habit.habit_name,
+              completed: habit.completed
+            })),
+            mood: dateEntry.mood ? {
+              mood: dateEntry.mood.mood,
+              symptoms: dateEntry.mood.symptoms,
+              notes: dateEntry.mood.notes,
+              date: dateEntry.mood.date
+            } : null,
+            completedCount: dateEntry.completed_habits,
+            totalHabits: dateEntry.total_habits,
+            progressPercentage: dateEntry.completion_percentage
+          };
+          
+          setSelectedDateProgress(convertedEntry);
+          console.log('✅ Progress data loaded for date:', dateString);
+        } else {
+          setSelectedDateProgress(null);
+          console.log('⚠️ No entry found for date:', dateString);
+        }
+      } else {
+        setSelectedDateProgress(null);
+      }
+    } catch (error) {
+      console.error('❌ Error loading date progress:', error);
+      setSelectedDateProgress(null);
+    } finally {
+      setIsLoadingDateProgress(false);
     }
   };
 
@@ -1108,52 +1163,69 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           </TouchableOpacity>
         )}
 
-        {/* History Toggle */}
-        <TouchableOpacity 
-          style={styles.historyToggle}
-          onPress={() => setShowHistory(!showHistory)}
-        >
-          <Text style={styles.historyToggleText}>
-            {showHistory ? 'Hide' : 'Show'} Habit History
-          </Text>
-          <Ionicons 
-            name={showHistory ? "chevron-up" : "chevron-down"} 
-            size={20} 
-            color={colors.primary} 
-          />
-        </TouchableOpacity>
+        {/* History Section - Always Visible */}
+        <View style={styles.historyCard}>
+          <View style={styles.historyHeader}>
+            <Text style={styles.historyTitle}>Habit History</Text>
+            {isLoadingHistory && (
+              <Ionicons name="sync" size={16} color={colors.primary} />
+            )}
+          </View>
 
-        {/* History Section */}
-        {showHistory && (
-          <View style={styles.historyCard}>
-            <View style={styles.historyHeader}>
-              <Text style={styles.historyTitle}>Habit History</Text>
-              {isLoadingHistory && (
-                <Ionicons name="sync" size={16} color={colors.primary} />
-              )}
+          {/* Calendar */}
+          <View style={styles.calendarContainer}>
+            <CalendarPicker
+              onDateChange={(date: Date) => {
+                setSelectedDate(date);
+                loadDateProgress(date);
+                setShowDateModal(true);
+              }}
+              selectedStartDate={selectedDate}
+              selectedEndDate={selectedDate}
+              allowRangeSelection={false}
+              minDate={new Date(2020, 0, 1)}
+              maxDate={new Date()}
+              todayBackgroundColor={colors.primary}
+              selectedDayColor={colors.primary}
+              selectedDayTextColor="#FFFFFF"
+              textStyle={styles.calendarText}
+              customDatesStyles={dailyEntries.map(entry => ({
+                date: new Date(entry.date),
+                style: {
+                  backgroundColor: entry.progressPercentage === 100 ? colors.success : 
+                                   entry.progressPercentage >= 50 ? '#FCD34D' : '#FEE2E2',
+                  borderRadius: 20,
+                },
+                textStyle: {
+                  color: entry.progressPercentage === 100 ? '#FFFFFF' : '#1F2937',
+                  fontWeight: '600',
+                },
+              }))}
+            />
+          </View>
+          
+          {isLoadingHistory ? (
+            <View style={styles.historyLoading}>
+              <Text style={styles.historyLoadingText}>Loading habit history...</Text>
             </View>
-            
-            {isLoadingHistory ? (
-              <View style={styles.historyLoading}>
-                <Text style={styles.historyLoadingText}>Loading habit history...</Text>
-              </View>
-            ) : historyError ? (
-              <View style={styles.historyError}>
-                <Text style={styles.historyErrorText}>{historyError}</Text>
-                <TouchableOpacity 
-                  style={styles.historyRetryButton}
-                  onPress={loadDailyHabitsHistory}
-                >
-                  <Text style={styles.historyRetryButtonText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : dailyEntries.length === 0 ? (
-              <View style={styles.historyEmpty}>
-                <Text style={styles.historyEmptyText}>No habit history found</Text>
-                <Text style={styles.historyEmptySubtext}>Start tracking your habits to see your progress here</Text>
-              </View>
-            ) : (
-              dailyEntries.map((entry) => (
+          ) : historyError ? (
+            <View style={styles.historyError}>
+              <Text style={styles.historyErrorText}>{historyError}</Text>
+              <TouchableOpacity 
+                style={styles.historyRetryButton}
+                onPress={loadDailyHabitsHistory}
+              >
+                <Text style={styles.historyRetryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : dailyEntries.length === 0 ? (
+            <View style={styles.historyEmpty}>
+              <Text style={styles.historyEmptyText}>No habit history found</Text>
+              <Text style={styles.historyEmptySubtext}>Start tracking your habits to see your progress here</Text>
+            </View>
+          ) : (
+            <>
+              {dailyEntries.slice(0, displayedHistoryCount).map((entry) => (
                 <View key={entry.id} style={styles.historyEntry}>
                   <View style={styles.historyEntryHeader}>
                     <Text style={styles.historyDate}>{formatDate(entry.date)}</Text>
@@ -1208,10 +1280,147 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                     ))}
                   </View>
                 </View>
-              ))
-            )}
+              ))}
+              
+              {/* Load More Button */}
+              {dailyEntries.length > displayedHistoryCount && (
+                <TouchableOpacity 
+                  style={styles.loadMoreButton}
+                  onPress={() => setDisplayedHistoryCount(prev => Math.min(prev + 5, dailyEntries.length))}
+                >
+                  <Text style={styles.loadMoreButtonText}>
+                    Load More ({dailyEntries.length - displayedHistoryCount} more days)
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color={colors.primary} />
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* Date Progress Modal */}
+        <Modal
+          visible={showDateModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowDateModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.dateModalContent}>
+              <View style={styles.dateModalHeader}>
+                <Text style={styles.dateModalTitle}>
+                  {selectedDate ? formatDate(selectedDate.toISOString().split('T')[0]) : 'Progress Details'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.dateModalCloseButton}
+                  onPress={() => setShowDateModal(false)}
+                >
+                  <Ionicons name="close" size={24} color="#1F2937" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.dateModalScrollView} showsVerticalScrollIndicator={false}>
+                {isLoadingDateProgress ? (
+                  <View style={styles.dateModalLoading}>
+                    <Text style={styles.dateModalLoadingText}>Loading progress...</Text>
+                  </View>
+                ) : selectedDateProgress ? (
+                  <>
+                    {/* Progress Summary */}
+                    <View style={styles.dateModalSection}>
+                      <View style={styles.dateModalProgressHeader}>
+                        <Text style={styles.dateModalProgressText}>
+                          {selectedDateProgress.completedCount}/{selectedDateProgress.totalHabits} habits completed
+                        </Text>
+                        <Text style={styles.dateModalProgressPercentage}>
+                          {selectedDateProgress.progressPercentage.toFixed(0)}%
+                        </Text>
+                      </View>
+                      <View style={styles.dateModalProgressBar}>
+                        <View 
+                          style={[
+                            styles.dateModalProgressFill, 
+                            { width: `${selectedDateProgress.progressPercentage}%` }
+                          ]} 
+                        />
+                      </View>
+                    </View>
+
+                    {/* Mood Entry */}
+                    {selectedDateProgress.mood && (
+                      <View style={styles.dateModalSection}>
+                        <Text style={styles.dateModalSectionTitle}>Mood</Text>
+                        <View style={styles.dateModalMood}>
+                          <Text style={styles.dateModalMoodEmoji}>
+                            {getMoodEmoji(selectedDateProgress.mood.mood)}
+                          </Text>
+                          <Text style={styles.dateModalMoodLabel}>
+                            {getMoodLabel(selectedDateProgress.mood.mood)}
+                          </Text>
+                        </View>
+                        {selectedDateProgress.mood.symptoms.length > 0 && (
+                          <View style={styles.dateModalSymptoms}>
+                            <Text style={styles.dateModalSymptomsTitle}>Symptoms:</Text>
+                            <View style={styles.dateModalSymptomsList}>
+                              {selectedDateProgress.mood.symptoms.map((symptom, index) => (
+                                <View key={index} style={styles.dateModalSymptomTag}>
+                                  <Text style={styles.dateModalSymptomText}>{symptom}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+                        {selectedDateProgress.mood.notes && (
+                          <View style={styles.dateModalNotes}>
+                            <Text style={styles.dateModalNotesTitle}>Notes:</Text>
+                            <Text style={styles.dateModalNotesText}>{selectedDateProgress.mood.notes}</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    {/* Habits List */}
+                    <View style={styles.dateModalSection}>
+                      <Text style={styles.dateModalSectionTitle}>Habits</Text>
+                      {selectedDateProgress.habits.map((habit, index) => (
+                        <View key={index} style={styles.dateModalHabitItem}>
+                          <Ionicons 
+                            name={habit.completed ? "checkmark-circle" : "close-circle"} 
+                            size={20} 
+                            color={habit.completed ? colors.success : colors.error} 
+                          />
+                          <Text style={[
+                            styles.dateModalHabitText,
+                            !habit.completed && styles.dateModalHabitTextIncomplete
+                          ]}>
+                            {habit.habit}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.dateModalEmpty}>
+                    <Ionicons name="calendar-outline" size={48} color={colors.textSecondary} />
+                    <Text style={styles.dateModalEmptyText}>No progress tracked for this date</Text>
+                    <Text style={styles.dateModalEmptySubtext}>
+                      Start tracking your habits to see your progress here
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+
+              <View style={styles.dateModalFooter}>
+                <TouchableOpacity
+                  style={styles.dateModalCloseButtonLarge}
+                  onPress={() => setShowDateModal(false)}
+                >
+                  <Text style={styles.dateModalCloseButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        )}
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
@@ -1573,22 +1782,33 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     opacity: 0.8,
   },
-  historyToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  calendarContainer: {
+    marginBottom: 20,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    paddingHorizontal: 16,
+    padding: 12,
+  },
+  calendarText: {
+    fontSize: 14,
+    color: '#1F2937',
+  },
+  loadMoreButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingVertical: 12,
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.primary,
   },
-  historyToggleText: {
-    fontSize: 16,
+  loadMoreButtonText: {
+    fontSize: 14,
     fontWeight: '600',
     color: colors.primary,
+    marginRight: 8,
   },
   historyCard: {
     backgroundColor: '#FFFFFF',
@@ -1729,6 +1949,186 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  // Date Modal Styles
+  dateModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingBottom: 20,
+  },
+  dateModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dateModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  dateModalCloseButton: {
+    padding: 4,
+  },
+  dateModalScrollView: {
+    maxHeight: 500,
+    padding: 20,
+  },
+  dateModalLoading: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  dateModalLoadingText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  dateModalSection: {
+    marginBottom: 24,
+  },
+  dateModalSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  dateModalProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dateModalProgressText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  dateModalProgressPercentage: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  dateModalProgressBar: {
+    height: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  dateModalProgressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 4,
+  },
+  dateModalMood: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  dateModalMoodEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  dateModalMoodLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  dateModalSymptoms: {
+    marginTop: 12,
+  },
+  dateModalSymptomsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  dateModalSymptomsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  dateModalSymptomTag: {
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  dateModalSymptomText: {
+    fontSize: 12,
+    color: '#1F2937',
+  },
+  dateModalNotes: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+  },
+  dateModalNotesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  dateModalNotesText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  dateModalHabitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dateModalHabitText: {
+    fontSize: 16,
+    color: '#1F2937',
+    marginLeft: 12,
+    flex: 1,
+  },
+  dateModalHabitTextIncomplete: {
+    color: '#9CA3AF',
+    textDecorationLine: 'line-through',
+  },
+  dateModalEmpty: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  dateModalEmptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  dateModalEmptySubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  dateModalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  dateModalCloseButtonLarge: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  dateModalCloseButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   // Phase tracking styles
   cyclePhaseBlock: {
