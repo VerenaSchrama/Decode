@@ -464,9 +464,11 @@ export default function AnalysisScreen({
               <TouchableOpacity 
                 style={styles.changeInterventionButtonTop}
                 onPress={() => {
-                  // Navigate to change intervention screen
-                  // Use a custom state flag since currentScreen type doesn't include 'change-intervention'
-                  updateCurrentScreen('change-intervention' as any);
+                  // Navigate to change intervention screen using navigation prop
+                  // We'll pass a callback to handle this in DiaryStack
+                  if (onNavigateToChangeIntervention) {
+                    onNavigateToChangeIntervention();
+                  }
                 }}
               >
                 <Text style={styles.changeInterventionButtonText}>Change your intervention</Text>

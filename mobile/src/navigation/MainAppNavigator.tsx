@@ -32,30 +32,20 @@ interface MainAppNavigatorProps {
 }
 
 function DiaryStack({ intakeData, currentIntervention, selectedHabits }: { intakeData?: any; currentIntervention?: any; selectedHabits: string[] }) {
-  const { state, updateCurrentScreen } = useAppState();
+  const { updateCurrentScreen } = useAppState();
   const [showChat, setShowChat] = useState(false);
   const [showChangeIntervention, setShowChangeIntervention] = useState(false);
 
-  // Check if we should show change intervention screen
-  // Use string comparison since currentScreen type may not include 'change-intervention'
-  const shouldShowChangeIntervention = String(state.currentScreen) === 'change-intervention' || showChangeIntervention;
-  
-  // Listen for screen changes to show change intervention screen
-  React.useEffect(() => {
-    if (String(state.currentScreen) === 'change-intervention') {
-      setShowChangeIntervention(true);
-    }
-  }, [state.currentScreen]);
-
-  if (shouldShowChangeIntervention) {
+  // Show change intervention screen if flag is set
+  if (showChangeIntervention) {
     return (
       <ChangeInterventionScreen
         onComplete={() => {
-          updateCurrentScreen('main-app');
           setShowChangeIntervention(false);
+          // Refresh the screen by staying in main-app
+          updateCurrentScreen('main-app');
         }}
         onCancel={() => {
-          updateCurrentScreen('main-app');
           setShowChangeIntervention(false);
         }}
       />
@@ -79,6 +69,7 @@ function DiaryStack({ intakeData, currentIntervention, selectedHabits }: { intak
       currentIntervention={currentIntervention}
       selectedHabits={selectedHabits}
       onNavigateToChat={() => setShowChat(true)}
+      onNavigateToChangeIntervention={() => setShowChangeIntervention(true)}
     />
   );
 }
