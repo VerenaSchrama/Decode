@@ -324,19 +324,18 @@ class InterventionPeriodService:
                 old_period_id = old_period['id']
                 old_habits = old_period.get('selected_habits', [])
                 
-                # Mark old period as completed (database constraint doesn't allow 'abandoned')
-                # Use 'completed' status with note indicating it was changed/abandoned
+                # Mark old period as abandoned
                 self.supabase.client.table('intervention_periods')\
                     .update({
-                        'status': 'completed',
+                        'status': 'abandoned',
                         'actual_end_date': datetime.now().isoformat(),
                         'updated_at': datetime.now().isoformat(),
-                        'notes': 'Completed (changed): User changed to new intervention'
+                        'notes': 'Abandoned: User changed to new intervention'
                     })\
                     .eq('id', old_period_id)\
                     .execute()
                 
-                print(f"✅ Marked old intervention period {old_period_id} as completed (changed to new intervention)")
+                print(f"✅ Marked old intervention period {old_period_id} as abandoned")
                 
                 # Step 2: Deactivate old habits
                 # Note: We only deactivate habits that were part of this specific intervention period
