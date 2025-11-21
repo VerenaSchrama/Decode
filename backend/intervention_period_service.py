@@ -89,7 +89,9 @@ class InterventionPeriodService:
         
         try:
             # Insert into intervention_periods table
+            print(f"📝 Inserting intervention period with data: {period_data}")
             result = self.supabase.client.table('intervention_periods').insert(period_data).execute()
+            print(f"📥 Insert result: {result.data if result.data else 'No data returned'}")
             
             if result.data:
                 period_id = result.data[0]['id']
@@ -100,7 +102,12 @@ class InterventionPeriodService:
                     try:
                         # Get all available habits to find their IDs
                         all_habits = self.supabase.client.table('HabitsBASE').select('*').execute()
-                        habit_name_to_id = {habit['Habit_Name']: habit['Habit_ID'] for habit in all_habits.data}
+                        if not all_habits.data:
+                            print(f"⚠️ No habits found in HabitsBASE table")
+                            habit_name_to_id = {}
+                        else:
+                            habit_name_to_id = {habit['Habit_Name']: habit['Habit_ID'] for habit in all_habits.data}
+                            print(f"✅ Loaded {len(habit_name_to_id)} habits from HabitsBASE")
                         
                         # Create or reactivate user_habits entries for each selected habit
                         user_habits_data = []
@@ -159,7 +166,9 @@ class InterventionPeriodService:
                     
                     except Exception as habit_error:
                         print(f"⚠️ Error storing user_habits: {habit_error}")
-                        # Continue even if habits storage fails
+                        import traceback
+                        print(traceback.format_exc())
+                        # Continue even if habits storage fails - intervention period is still created
                 
                 return {
                     "success": True,
@@ -167,10 +176,15 @@ class InterventionPeriodService:
                     "message": f"Started tracking intervention: {intervention_name}"
                 }
             else:
-                raise Exception("Failed to insert intervention period")
+                error_msg = "Failed to insert intervention period - no data returned from database"
+                print(f"❌ {error_msg}")
+                print(f"   Result object: {result}")
+                raise Exception(error_msg)
                 
         except Exception as e:
             print(f"❌ Error starting intervention period: {e}")
+            import traceback
+            print(traceback.format_exc())
             return {
                 "success": False,
                 "error": str(e),
