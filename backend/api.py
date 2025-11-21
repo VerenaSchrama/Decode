@@ -2803,14 +2803,35 @@ async def get_intervention_period_progress(
             raise HTTPException(status_code=404, detail="Intervention period not found")
         
         # Parse period dates
-        start_date = datetime.fromisoformat(period['start_date'].replace('Z', '+00:00')).date()
+        try:
+            start_date = datetime.fromisoformat(period['start_date'].replace('Z', '+00:00')).date()
+        except Exception as e:
+            print(f"❌ Error parsing start_date: {e}, period: {period}")
+            raise HTTPException(status_code=500, detail="Invalid start_date format in intervention period")
+        
         today = datetime.now().date()
         
-        # Calculate end date (use actual_end_date if completed, otherwise planned end_date or calculate from duration)
+        # Calculate end date (use actual_end_date if completed/abandoned, otherwise planned end_date or calculate from duration)
         if period.get('actual_end_date'):
-            end_date = datetime.fromisoformat(period['actual_end_date'].replace('Z', '+00:00')).date()
+            try:
+                end_date = datetime.fromisoformat(period['actual_end_date'].replace('Z', '+00:00')).date()
+            except Exception as e:
+                print(f"⚠️ Error parsing actual_end_date, using end_date instead: {e}")
+                if period.get('end_date'):
+                    end_date = datetime.fromisoformat(period['end_date'].replace('Z', '+00:00')).date()
+                elif period.get('planned_duration_days'):
+                    end_date = start_date + timedelta(days=period['planned_duration_days'] - 1)
+                else:
+                    end_date = start_date + timedelta(days=29)
         elif period.get('end_date'):
-            end_date = datetime.fromisoformat(period['end_date'].replace('Z', '+00:00')).date()
+            try:
+                end_date = datetime.fromisoformat(period['end_date'].replace('Z', '+00:00')).date()
+            except Exception as e:
+                print(f"⚠️ Error parsing end_date, calculating from duration: {e}")
+                if period.get('planned_duration_days'):
+                    end_date = start_date + timedelta(days=period['planned_duration_days'] - 1)
+                else:
+                    end_date = start_date + timedelta(days=29)
         elif period.get('planned_duration_days'):
             end_date = start_date + timedelta(days=period['planned_duration_days'] - 1)
         else:
