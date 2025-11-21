@@ -710,7 +710,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         user_id: User ID
         entry_date: Date in YYYY-MM-DD format
         habits: Array of habit objects with completion status
-        mood: Mood entry object (optional)
+        mood: Mood entry object (REQUIRED - must include mood value)
         cycle_phase: Current cycle phase (optional)
         
     Returns:
@@ -752,6 +752,19 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
 
         entry_date = request.get('entry_date', datetime.now().strftime('%Y-%m-%d'))
         entry_date_dt = datetime.fromisoformat(entry_date).date()
+        
+        # Validate that mood is provided (required field)
+        mood = request.get('mood')
+        if not mood:
+            raise HTTPException(
+                status_code=400, 
+                detail="Mood is required. Please track your mood before saving progress."
+            )
+        if not mood.get('mood') or mood.get('mood') is None:
+            raise HTTPException(
+                status_code=400, 
+                detail="Mood value is required. Please select a mood rating before saving progress."
+            )
         
         # Delete existing entries for this date before creating new ones (allows updates)
         # This ensures only the latest update is stored for each date
@@ -816,7 +829,7 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             # Continue without linking - not a critical error
             
         habits = request.get('habits', [])
-        mood = request.get('mood', None)
+        # Mood is already validated above, so it's guaranteed to exist here
         cycle_phase = request.get('cycle_phase', 'follicular')
         
         # Calculate completion statistics
@@ -888,30 +901,34 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
         
         # Create daily mood entry (stored separately from habit entries, linked via habit_entry_ids)
         # Note: Existing entries for this date have already been deleted above
-        if mood:
-            daily_mood_data = {
+        # Mood is now required, so this should always execute
+        daily_mood_data = {
                 'user_id': user_id,
                 'entry_date': entry_date,
-                'mood': mood.get('mood'),
-                'notes': mood.get('notes', ''),
-                'symptoms': mood.get('symptoms', []),
-                'cycle_phase': cycle_phase,
-                'habit_entry_ids': entry_ids
-            }
-            # Add intervention_period_id if available (column may not exist yet)
-            if intervention_period_id:
-                daily_mood_data['intervention_period_id'] = intervention_period_id
-            try:
-                # Use insert since we've already deleted existing entries above
-                supabase_client.client.table('daily_moods').insert(daily_mood_data).execute()
-                print(f"✅ Created daily_mood entry for {entry_date}")
-            except Exception as e:
-                print(f"❌ ERROR creating daily_mood entry: {e}")
-                print(f"   Data: {daily_mood_data}")
+            'mood': mood.get('mood'),
+            'notes': mood.get('notes', ''),
+            'symptoms': mood.get('symptoms', []),
+            'cycle_phase': cycle_phase,
+            'habit_entry_ids': entry_ids
+        }
+        # Add intervention_period_id if available (column may not exist yet)
+        if intervention_period_id:
+            daily_mood_data['intervention_period_id'] = intervention_period_id
+        try:
+            # Use insert since we've already deleted existing entries above
+            supabase_client.client.table('daily_moods').insert(daily_mood_data).execute()
+            print(f"✅ Created daily_mood entry for {entry_date}")
+        except Exception as e:
+            print(f"❌ ERROR creating daily_mood entry: {e}")
+            print(f"   Data: {daily_mood_data}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to save mood entry: {str(e)}"
+            )
         
         # Create daily summary
         # Note: overall_mood and overall_notes still exist in schema for backward compatibility
-        # We populate them from mood data if available, but primary mood storage is in daily_moods table
+        # We populate them from mood data (mood is now required)
         daily_summary_data = {
             'user_id': user_id,
             'entry_date': entry_date,
@@ -919,8 +936,8 @@ async def save_daily_progress(request: dict, authorization: str = Header(None)):
             'cycle_phase': cycle_phase,
                 'total_habits': total_habits,
             'completed_habits': len(completed_habits),
-            'overall_mood': mood.get('mood') if mood else None,
-            'overall_notes': mood.get('notes', '') if mood else None
+            'overall_mood': mood.get('mood'),  # Mood is required, so this will always have a value
+            'overall_notes': mood.get('notes', '')
         }
         # Add intervention_period_id if available (column may not exist yet)
         if intervention_period_id:
@@ -1626,12 +1643,60 @@ async def send_chat_message(request: ChatRequest, authorization: str = Header(No
         
         print(f"Built user context: {user_context}")
         
-        # Get RAG response using the existing pipeline
+        # Check if user is asking for a recipe (bypass vectorstore for recipes)
+        message_lower = request.message.lower()
+        is_recipe_request = any(keyword in message_lower for keyword in [
+            'recipe', 'recipes', 'cook', 'cooking', 'meal', 'meals', 
+            'dish', 'dishes', 'make', 'prepare', 'how to cook',
+            'what to cook', 'dinner', 'lunch', 'breakfast', 'snack'
+        ])
+        
+        # Get RAG response using the existing pipeline (only if not a recipe request)
         from interventions.inflo_context import get_inflo_context
-        inflo_context = get_inflo_context(request.message)
+        inflo_context = None
+        if not is_recipe_request:
+            inflo_context = get_inflo_context(request.message)
         
         # Create enhanced prompt with user context
-        enhanced_prompt = f"""
+        if is_recipe_request:
+            # Recipe generation prompt (bypasses vectorstore)
+            enhanced_prompt = f"""
+You are a creative and knowledgeable nutritionist specializing in cycle-aware nutrition and women's health.
+Generate personalized, delicious recipes based on the user's profile, dietary preferences, current cycle phase, and intervention goals.
+
+USER CONTEXT:
+{user_context}
+
+USER REQUEST: {request.message}
+
+RECIPE GENERATION INSTRUCTIONS:
+- Create a complete, detailed recipe with:
+  * Recipe name
+  * Brief description (1-2 sentences) explaining why this recipe is good for their current cycle phase and goals
+  * Ingredients list with specific quantities
+  * Step-by-step cooking instructions
+  * Serving size
+  * Optional: nutritional highlights or tips
+- Personalize the recipe based on:
+  * Their current cycle phase (follicular, ovulatory, luteal, menstrual)
+  * Their dietary preferences (vegetarian, vegan, etc.)
+  * Their current intervention and health goals
+  * Any symptoms they're experiencing
+- Make recipes:
+  * Practical and easy to prepare
+  * Using whole, nutrient-dense foods
+  * Aligned with cycle-aware nutrition principles
+  * Delicious and satisfying
+- If the user asks for a specific type of recipe (breakfast, lunch, dinner, snack), create that type
+- If they mention specific ingredients or foods, incorporate them creatively
+- Keep the tone warm, encouraging, and practical
+- Format the recipe clearly with sections for ingredients and instructions
+
+Generate a complete, personalized recipe that the user can cook today.
+"""
+        else:
+            # Standard RAG-based prompt (uses vectorstore)
+            enhanced_prompt = f"""
         You are a knowledgeable nutritionist and women's health expert specializing in cycle-aware nutrition and wellness.
         You have access to scientific research and evidence-based practices on women's health and food interventions.
         You are trained to provide personalized advice based on the user's profile and current intervention and habits, defined as:
@@ -1844,8 +1909,59 @@ async def chat_stream(request_raw: Request, authorization: str = Header(None)):
         final_selected_habits,
         cycle_phase_info
     )
-    inflo_context = get_inflo_context(user_message)
-    enhanced_prompt = f"""
+    # Check if user is asking for a recipe (bypass vectorstore for recipes)
+    message_lower = user_message.lower()
+    is_recipe_request = any(keyword in message_lower for keyword in [
+        'recipe', 'recipes', 'cook', 'cooking', 'meal', 'meals', 
+        'dish', 'dishes', 'make', 'prepare', 'how to cook',
+        'what to cook', 'dinner', 'lunch', 'breakfast', 'snack'
+    ])
+    
+    # Get RAG response using the existing pipeline (only if not a recipe request)
+    inflo_context = None
+    if not is_recipe_request:
+        inflo_context = get_inflo_context(user_message)
+    
+    # Create enhanced prompt with user context
+    if is_recipe_request:
+        # Recipe generation prompt (bypasses vectorstore)
+        enhanced_prompt = f"""
+You are a creative and knowledgeable nutritionist specializing in cycle-aware nutrition and women's health.
+Generate personalized, delicious recipes based on the user's profile, dietary preferences, current cycle phase, and intervention goals.
+
+USER CONTEXT:
+{user_context_str}
+
+USER REQUEST: {user_message}
+
+RECIPE GENERATION INSTRUCTIONS:
+- Create a complete, detailed recipe with:
+  * Recipe name
+  * Brief description (1-2 sentences) explaining why this recipe is good for their current cycle phase and goals
+  * Ingredients list with specific quantities
+  * Step-by-step cooking instructions
+  * Serving size
+  * Optional: nutritional highlights or tips
+- Personalize the recipe based on:
+  * Their current cycle phase (follicular, ovulatory, luteal, menstrual)
+  * Their dietary preferences (vegetarian, vegan, etc.)
+  * Their current intervention and health goals
+  * Any symptoms they're experiencing
+- Make recipes:
+  * Practical and easy to prepare
+  * Using whole, nutrient-dense foods
+  * Aligned with cycle-aware nutrition principles
+  * Delicious and satisfying
+- If the user asks for a specific type of recipe (breakfast, lunch, dinner, snack), create that type
+- If they mention specific ingredients or foods, incorporate them creatively
+- Keep the tone warm, encouraging, and practical
+- Format the recipe clearly with sections for ingredients and instructions
+
+Generate a complete, personalized recipe that the user can cook today.
+"""
+    else:
+        # Standard RAG-based prompt (uses vectorstore)
+        enhanced_prompt = f"""
 You are a knowledgeable nutritionist and women's health expert specializing in cycle-aware nutrition and wellness.
 You have access to scientific research and evidence-based practices on women's health and food interventions.
 You are trained to provide personalized advice based on the user's profile and current intervention and habits, defined as:
@@ -2447,6 +2563,13 @@ async def reset_intervention_period(
     - cycle_phase: str (optional - will be fetched if not provided)
     """
     try:
+        import json
+        print("=" * 80)
+        print("🔄 POST /intervention-periods/reset - REQUEST RECEIVED")
+        print("=" * 80)
+        print(f"📥 Request body: {json.dumps(request, indent=2, default=str)}")
+        print(f"🔐 Authorization header present: {bool(authorization)}")
+        
         from intervention_period_service import InterventionPeriodService
         intervention_period_service = InterventionPeriodService()
         from auth_service import AuthService
@@ -2460,12 +2583,19 @@ async def reset_intervention_period(
                 user_info = await auth_service.verify_token(access_token)
                 if user_info and user_info.get("success"):
                     user_id = user_info["user_id"]
+                    print(f"✅ Authenticated user: {user_id}")
                 else:
+                    print("❌ Token verification failed")
                     raise HTTPException(status_code=401, detail="Invalid authentication token")
+            except HTTPException:
+                raise
             except Exception as e:
                 print(f"❌ Token verification error: {e}")
+                import traceback
+                print(traceback.format_exc())
                 raise HTTPException(status_code=401, detail="Authentication failed")
         else:
+            print("❌ No authorization header provided")
             raise HTTPException(status_code=401, detail="Authentication token required")
         
         # Extract data from request
@@ -2477,10 +2607,21 @@ async def reset_intervention_period(
         cycle_phase = request.get("cycle_phase")
         intake_id = request.get("intake_id")  # Optional - will reuse existing if not provided
         
+        print(f"📋 Extracted data:")
+        print(f"   - intervention_id: {intervention_id}")
+        print(f"   - intervention_name: {intervention_name}")
+        print(f"   - selected_habits: {selected_habits} (count: {len(selected_habits)})")
+        print(f"   - planned_duration_days: {planned_duration_days}")
+        print(f"   - start_date: {start_date}")
+        print(f"   - cycle_phase: {cycle_phase}")
+        print(f"   - intake_id: {intake_id}")
+        
         if not intervention_name:
+            print("❌ Missing required field: intervention_name")
             raise HTTPException(status_code=400, detail="intervention_name is required")
         
         if not selected_habits or len(selected_habits) == 0:
+            print("❌ Missing required field: selected_habits")
             raise HTTPException(status_code=400, detail="selected_habits is required and cannot be empty")
         
         # Fetch cycle phase from database if not provided
@@ -2492,11 +2633,13 @@ async def reset_intervention_period(
                 phase_result = await cycle_service.get_current_phase(user_id)
                 if phase_result.get('success'):
                     cycle_phase = phase_result.get('current_phase')
+                    print(f"✅ Fetched cycle phase from database: {cycle_phase}")
             except Exception as e:
                 print(f"⚠️ Failed to fetch cycle phase: {e}")
                 # Continue without cycle_phase
         
         # Reset intervention period
+        print(f"🔄 Calling intervention_period_service.reset_intervention_period...")
         result = intervention_period_service.reset_intervention_period(
             user_id=user_id,
             intervention_id=intervention_id,
@@ -2508,10 +2651,14 @@ async def reset_intervention_period(
             intake_id=intake_id
         )
         
+        print(f"📥 Service result: {json.dumps(result, indent=2, default=str)}")
+        
         if result.get("success"):
+            print(f"✅ Intervention period reset successfully: {result.get('period_id')}")
             return result
         else:
             error_msg = result.get("error", "Failed to reset intervention period")
+            print(f"❌ Service returned error: {error_msg}")
             raise HTTPException(status_code=500, detail=error_msg)
             
     except HTTPException:

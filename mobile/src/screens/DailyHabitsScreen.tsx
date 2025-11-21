@@ -551,11 +551,23 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
           progressPercentage: entry.completion_percentage
         }));
         
-        // Sort by date (newest first) - API already returns in desc order, but ensure it
-        convertedEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // Remove duplicates by date (keep the first occurrence - most recent from API)
+        // This prevents duplicate entries if somehow the API returns duplicates
+        const seenDates = new Set<string>();
+        const uniqueEntries = convertedEntries.filter(entry => {
+          if (seenDates.has(entry.date)) {
+            console.log(`⚠️ Duplicate entry found for date ${entry.date}, skipping duplicate`);
+            return false;
+          }
+          seenDates.add(entry.date);
+          return true;
+        });
         
-        setDailyEntries(convertedEntries);
-        console.log('✅ Daily habits history loaded:', convertedEntries.length, 'entries');
+        // Sort by date (newest first) - API already returns in desc order, but ensure it
+        uniqueEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        setDailyEntries(uniqueEntries);
+        console.log('✅ Daily habits history loaded:', uniqueEntries.length, 'entries (duplicates removed if any)');
       } else {
         console.log('⚠️ No history data available');
         setDailyEntries([]);
@@ -653,6 +665,16 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
   const saveProgressToAPI = async () => {
     if (isSavingProgress) return;
     
+    // Validate that mood is required
+    if (!moodEntry || moodEntry.mood === null || moodEntry.mood === undefined) {
+      showToast('Please track your mood before saving progress. Mood is required.', 'error');
+      // Automatically open mood modal if not set
+      if (!moodEntry) {
+        openMoodModal();
+      }
+      return;
+    }
+    
     setIsSavingProgress(true);
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -662,12 +684,13 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
         notes: h.notes || ''
       }));
 
-      const apiMood: APIMoodEntry | undefined = moodEntry ? {
+      // Mood is now required, so this should always be defined
+      const apiMood: APIMoodEntry = {
         mood: moodEntry.mood,
         symptoms: moodEntry.symptoms,
         notes: moodEntry.notes,
         date: moodEntry.date
-      } : undefined;
+      };
 
       console.log('💾 Saving daily progress (will update if entry exists)...');
       await apiService.saveDailyProgress({
@@ -692,13 +715,14 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
       
       // Refresh daily habits history to show updated data
       console.log('🔄 Refreshing daily habits history after save...');
-      await loadDailyHabitsHistory();
       
-      // Reload today's progress data to show the updated values
-      await loadTodayProgressData();
-      
-      // Also refresh today's tracking status
-      await checkTodayTrackingStatus();
+      // Refresh all data in parallel for faster UI update
+      await Promise.all([
+        loadDailyHabitsHistory(),
+        loadTodayProgressData(),
+        checkTodayTrackingStatus(),
+        loadCurrentStreak() // Also refresh streak
+      ]);
       
       showToast('Progress saved successfully!', 'success');
 
@@ -765,25 +789,9 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
 
   const saveDailyEntry = async () => {
     // Call the API to save progress
+    // Note: saveProgressToAPI() already calls loadDailyHabitsHistory() to refresh the UI
+    // So we don't need to manually add an entry here - that would create duplicates
     await saveProgressToAPI();
-    
-    // Also update local state for UI display
-    const today = new Date().toISOString().split('T')[0];
-    const completedCount = habitProgress.filter(h => h.completed).length;
-    const totalHabits = habitProgress.length;
-    const progressPercentage = totalHabits > 0 ? (completedCount / totalHabits) * 100 : 0;
-
-    const newEntry: DailyEntry = {
-      id: Date.now().toString(),
-      date: today,
-      habits: [...habitProgress],
-      mood: moodEntry,
-      completedCount,
-      totalHabits,
-      progressPercentage,
-    };
-
-    setDailyEntries(prev => [newEntry, ...prev]);
   };
 
   const formatDate = (dateString: string) => {
@@ -865,32 +873,32 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
         {cyclePhase && (
           <View style={styles.cyclePhaseBlock}>
             <Text style={styles.cyclePhaseBlockHeader}>Your cycle phase today</Text>
-            <View style={styles.phaseInfoCard}>
-              <Text style={styles.phaseName}>{cyclePhase.phase}</Text>
-              <Text style={styles.phaseDescription}>{cyclePhase.phaseDescription}</Text>
-              <Text style={styles.phaseDetails}>
-                Energy: {cyclePhase.energyLevel} | Focus: {cyclePhase.hormonalFocus}
-              </Text>
-              
-              {/* Learn More Dropdown */}
-              <TouchableOpacity 
-                style={styles.learnMoreButton}
-                onPress={() => setShowPhaseDetails(!showPhaseDetails)}
-              >
-                <Text style={styles.learnMoreText}>Learn more about my current phase</Text>
-                <Ionicons 
-                  name={showPhaseDetails ? "chevron-up" : "chevron-down"} 
-                  size={20} 
-                  color={colors.primary} 
-                />
-              </TouchableOpacity>
-              
-              {/* Detailed Phase Information - Collapsible */}
-              {showPhaseDetails && (
-                <View style={styles.phaseDetailsSection}>
-                  {getDetailedPhaseInfo(cyclePhase.phase)}
-                </View>
-              )}
+          <View style={styles.phaseInfoCard}>
+            <Text style={styles.phaseName}>{cyclePhase.phase}</Text>
+            <Text style={styles.phaseDescription}>{cyclePhase.phaseDescription}</Text>
+            <Text style={styles.phaseDetails}>
+              Energy: {cyclePhase.energyLevel} | Focus: {cyclePhase.hormonalFocus}
+            </Text>
+            
+            {/* Learn More Dropdown */}
+            <TouchableOpacity 
+              style={styles.learnMoreButton}
+              onPress={() => setShowPhaseDetails(!showPhaseDetails)}
+            >
+              <Text style={styles.learnMoreText}>Learn more about my current phase</Text>
+              <Ionicons 
+                name={showPhaseDetails ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color={colors.primary} 
+              />
+            </TouchableOpacity>
+            
+            {/* Detailed Phase Information - Collapsible */}
+            {showPhaseDetails && (
+              <View style={styles.phaseDetailsSection}>
+                {getDetailedPhaseInfo(cyclePhase.phase)}
+              </View>
+            )}
             </View>
           </View>
         )}
@@ -902,45 +910,45 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
             <Text style={styles.trackingCardTitle}>Complete Your Daily Tracking</Text>
             <Text style={styles.trackingCardSubtitle}>
               Track your habits and mood to save today's progress
-            </Text>
-          </View>
+          </Text>
+        </View>
 
           {/* Habits Section */}
           <View style={styles.trackingHabitsSection}>
             <Text style={styles.trackingSectionTitle}>Your Habits</Text>
-            {cyclePhase && (
+          {cyclePhase && (
               <Text style={styles.trackingPhaseContext}>
                 Optimized for your {cyclePhase.phase} phase
-              </Text>
-            )}
-            {habitProgress.map((habit, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
+            </Text>
+          )}
+          {habitProgress.map((habit, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
                   styles.habitCard,
                   habit.completed && styles.habitCardCompleted,
                   (isTodayTracked && !isEditing) && styles.habitCardLocked
-                ]}
-                onPress={() => toggleHabit(habit.habit)}
+              ]}
+              onPress={() => toggleHabit(habit.habit)}
                 disabled={isTodayTracked && !isEditing}
-              >
+            >
                 <View style={styles.habitCardContent}>
-                  <View style={[
+                <View style={[
                     styles.habitCardCheckbox,
                     habit.completed && styles.habitCardCheckboxCompleted
-                  ]}>
-                    {habit.completed && (
+                ]}>
+                  {habit.completed && (
                       <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                    )}
-                  </View>
+                  )}
+                </View>
                   <View style={styles.habitCardTextContainer}>
-                    <Text style={[
+                <Text style={[
                       styles.habitCardTitle,
                       habit.completed && styles.habitCardTitleCompleted
-                    ]}>
+                ]}>
                       {habit.completed && '✅ '}
-                      {habit.habit}
-                    </Text>
+                  {habit.habit}
+                </Text>
                     <Text style={[
                       styles.habitCardSubtitle,
                       habit.completed && styles.habitCardSubtitleCompleted
@@ -948,52 +956,55 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                       {getHabitSubtitle(habit.habit)}
                     </Text>
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
 
           {/* Divider */}
           <View style={styles.trackingDivider} />
 
           {/* Mood Section */}
           <View style={styles.trackingMoodSection}>
-            <Text style={styles.trackingSectionTitle}>How are you feeling today?</Text>
-            {moodEntry ? (
+            <View style={styles.trackingSectionTitleRow}>
+              <Text style={styles.trackingSectionTitle}>How are you feeling today?</Text>
+              <Text style={styles.requiredIndicator}>* Required</Text>
+            </View>
+          {moodEntry ? (
               <View style={styles.trackingMoodSelected}>
                 <View style={styles.trackingMoodInfo}>
                   <Text style={styles.trackingMoodEmoji}>{getMoodEmoji(moodEntry.mood)}</Text>
                   <Text style={styles.trackingMoodLabel}>{getMoodLabel(moodEntry.mood)}</Text>
-                  {moodEntry.symptoms.length > 0 && (
+              {moodEntry.symptoms.length > 0 && (
                     <View style={styles.trackingSymptomsPreview}>
                       <Text style={styles.trackingSymptomsPreviewText}>
-                        {moodEntry.symptoms.slice(0, 2).join(', ')}
-                        {moodEntry.symptoms.length > 2 && ` +${moodEntry.symptoms.length - 2} more`}
-                      </Text>
-                    </View>
-                  )}
+                    {moodEntry.symptoms.slice(0, 2).join(', ')}
+                    {moodEntry.symptoms.length > 2 && ` +${moodEntry.symptoms.length - 2} more`}
+                  </Text>
                 </View>
-                <TouchableOpacity 
+              )}
+                </View>
+              <TouchableOpacity 
                   style={[
                     styles.trackingChangeMoodButton,
                     (isTodayTracked && !isEditing) && styles.trackingMoodButtonLocked
                   ]}
-                  onPress={openMoodModal}
+                onPress={openMoodModal}
                   disabled={isTodayTracked && !isEditing}
-                >
+              >
                   <Text style={[
                     styles.trackingChangeMoodText,
                     (isTodayTracked && !isEditing) && styles.trackingMoodTextLocked
                   ]}>Update</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity 
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity 
                 style={[
                   styles.trackingMoodButton,
                   (isTodayTracked && !isEditing) && styles.trackingMoodButtonLocked
                 ]}
-                onPress={openMoodModal}
+              onPress={openMoodModal}
                 disabled={isTodayTracked && !isEditing}
               >
                 <Ionicons 
@@ -1005,8 +1016,8 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                   styles.trackingMoodButtonText,
                   (isTodayTracked && !isEditing) && styles.trackingMoodTextLocked
                 ]}>Choose your mood</Text>
-              </TouchableOpacity>
-            )}
+            </TouchableOpacity>
+          )}
           </View>
         </View>
 
@@ -1132,27 +1143,26 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
               onPress={() => setIsEditing(true)}
             >
               <Text style={styles.editButtonText}>Edit Today's Progress</Text>
-            </TouchableOpacity>
+        </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity 
+        <TouchableOpacity 
             style={[
               styles.saveButton, 
-              (completedCount === 0 && !moodEntry) && styles.saveButtonDisabled,
-              isCheckingStatus && styles.saveButtonDisabled
+              (!moodEntry || isCheckingStatus) && styles.saveButtonDisabled
             ]} 
             onPress={saveDailyEntry}
-            disabled={(completedCount === 0 && !moodEntry) || isCheckingStatus}
+            disabled={!moodEntry || isCheckingStatus}
           >
             <Text style={[
               styles.saveButtonText,
-              (completedCount === 0 && !moodEntry) && styles.saveButtonTextDisabled
+              (!moodEntry || isCheckingStatus) && styles.saveButtonTextDisabled
             ]}>
               {isEditing ? 'Save Changes' : 'Save Today\'s Progress'}
-            </Text>
-            {(completedCount === 0 && !moodEntry) && (
+          </Text>
+            {!moodEntry && (
               <Text style={styles.saveButtonHint}>
-                Complete habits and mood tracking first
+                * Mood tracking is required
               </Text>
             )}
             {isCheckingStatus && (
@@ -1160,12 +1170,12 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                 Checking today's status...
               </Text>
             )}
-          </TouchableOpacity>
+        </TouchableOpacity>
         )}
 
         {/* History Section - Always Visible */}
-        <View style={styles.historyCard}>
-          <View style={styles.historyHeader}>
+          <View style={styles.historyCard}>
+                <View style={styles.historyHeader}>
             <Text style={styles.historyTitle}>Habit History</Text>
             {isLoadingHistory && (
               <Ionicons name="sync" size={16} color={colors.primary} />
@@ -1228,59 +1238,59 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
               {dailyEntries.slice(0, displayedHistoryCount).map((entry) => (
                 <View key={entry.id} style={styles.historyEntry}>
                   <View style={styles.historyEntryHeader}>
-                    <Text style={styles.historyDate}>{formatDate(entry.date)}</Text>
-                    <Text style={styles.historyProgress}>
-                      {entry.completedCount}/{entry.totalHabits} habits
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.historyProgressBar}>
-                    <View 
-                      style={[
-                        styles.historyProgressFill, 
-                        { width: `${entry.progressPercentage}%` }
-                      ]} 
-                    />
-                  </View>
-
-                  {/* Mood Summary */}
-                  {entry.mood && (
-                    <View style={styles.historyMood}>
-                      <Text style={styles.historyMoodEmoji}>
-                        {getMoodEmoji(entry.mood.mood)}
-                      </Text>
-                      <Text style={styles.historyMoodLabel}>
-                        {getMoodLabel(entry.mood.mood)}
-                      </Text>
-                      {entry.mood.symptoms.length > 0 && (
-                        <Text style={styles.historySymptoms}>
-                          {entry.mood.symptoms.slice(0, 3).join(', ')}
-                          {entry.mood.symptoms.length > 3 && ` +${entry.mood.symptoms.length - 3}`}
-                        </Text>
-                      )}
-                    </View>
-                  )}
-
-                  {/* Habits Summary */}
-                  <View style={styles.historyHabits}>
-                    {entry.habits.map((habit, index) => (
-                      <View key={index} style={styles.historyHabitItem}>
-                        <Ionicons 
-                          name={habit.completed ? "checkmark-circle" : "close-circle"} 
-                          size={16} 
-                          color={habit.completed ? colors.success : colors.error} 
-                        />
-                        <Text style={[
-                          styles.historyHabitText,
-                          !habit.completed && styles.historyHabitTextIncomplete
-                        ]}>
-                          {habit.habit}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
+                  <Text style={styles.historyDate}>{formatDate(entry.date)}</Text>
+                  <Text style={styles.historyProgress}>
+                    {entry.completedCount}/{entry.totalHabits} habits
+                  </Text>
                 </View>
-              ))}
+                
+                <View style={styles.historyProgressBar}>
+                  <View 
+                    style={[
+                      styles.historyProgressFill, 
+                      { width: `${entry.progressPercentage}%` }
+                    ]} 
+                  />
+                </View>
+
+                {/* Mood Summary */}
+                {entry.mood && (
+                  <View style={styles.historyMood}>
+                    <Text style={styles.historyMoodEmoji}>
+                      {getMoodEmoji(entry.mood.mood)}
+                    </Text>
+                    <Text style={styles.historyMoodLabel}>
+                      {getMoodLabel(entry.mood.mood)}
+                    </Text>
+                    {entry.mood.symptoms.length > 0 && (
+                      <Text style={styles.historySymptoms}>
+                        {entry.mood.symptoms.slice(0, 3).join(', ')}
+                        {entry.mood.symptoms.length > 3 && ` +${entry.mood.symptoms.length - 3}`}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Habits Summary */}
+                <View style={styles.historyHabits}>
+                  {entry.habits.map((habit, index) => (
+                    <View key={index} style={styles.historyHabitItem}>
+                      <Ionicons 
+                        name={habit.completed ? "checkmark-circle" : "close-circle"} 
+                        size={16} 
+                        color={habit.completed ? colors.success : colors.error} 
+                      />
+                      <Text style={[
+                        styles.historyHabitText,
+                        !habit.completed && styles.historyHabitTextIncomplete
+                      ]}>
+                        {habit.habit}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
               
               {/* Load More Button */}
               {dailyEntries.length > displayedHistoryCount && (
@@ -1406,8 +1416,8 @@ export default function DailyHabitsScreen({ route }: DailyHabitsScreenProps) {
                     <Text style={styles.dateModalEmptySubtext}>
                       Start tracking your habits to see your progress here
                     </Text>
-                  </View>
-                )}
+          </View>
+        )}
               </ScrollView>
 
               <View style={styles.dateModalFooter}>
@@ -2336,11 +2346,21 @@ const styles = StyleSheet.create({
   trackingHabitsSection: {
     marginBottom: 20,
   },
+  trackingSectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   trackingSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 8,
+  },
+  requiredIndicator: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.error,
   },
   trackingPhaseContext: {
     fontSize: 14,

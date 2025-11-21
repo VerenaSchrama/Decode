@@ -48,7 +48,20 @@ class InterventionPeriodService:
         
         # Use user-selected start_date or default to now
         if start_date:
-            start_date_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            try:
+                # Handle different date formats
+                if 'T' in start_date or 'Z' in start_date:
+                    # ISO format with time: "2025-11-16T00:00:00Z" or "2025-11-16T00:00:00"
+                    start_date_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                else:
+                    # Date only format: "2025-11-16"
+                    from datetime import date as date_class
+                    date_obj = date_class.fromisoformat(start_date)
+                    start_date_dt = datetime.combine(date_obj, datetime.min.time())
+            except Exception as e:
+                print(f"⚠️ Error parsing start_date '{start_date}': {e}")
+                # Fallback to now if parsing fails
+                start_date_dt = datetime.now()
         else:
             start_date_dt = datetime.now()
         
